@@ -8,16 +8,10 @@ namespace WorkoutFitnessTrackerAPI.Services
 {
     public class TokenService
     {
-        private readonly IConfiguration _configuration;
-        public TokenService(IConfiguration configuration)
-        {
-            _configuration = configuration;
-        }
-
         public string GenerateJwtToken(User user, IEnumerable<string> roles)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["JwtSettings:Secret"]!);
+            var key = Encoding.ASCII.GetBytes(Environment.GetEnvironmentVariable("JWT_SECRET")!);
 
             var claims = new List<Claim>
             {

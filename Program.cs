@@ -45,7 +45,8 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var key = Encoding.ASCII.GetBytes(builder.Configuration["JwtSettings:Secret"]!);
+DotNetEnv.Env.Load();
+var key = Encoding.ASCII.GetBytes(Environment.GetEnvironmentVariable("JWT_SECRET")!);
 
 builder.Services.AddAuthentication(x =>
 {
@@ -69,7 +70,7 @@ builder.Services.AddAuthentication(x =>
 
 builder.Services.AddDbContext<WFTDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseSqlServer(Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"));
 });
 
 builder.Services.AddIdentityCore<User>(options =>
