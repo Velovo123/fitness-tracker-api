@@ -9,7 +9,6 @@ namespace WorkoutFitnessTrackerAPI.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<User> builder)
         {
-            builder.ApplyIdConfiguration();
 
             builder.HasMany(u => u.Workouts)
                    .WithOne(w => w.User)

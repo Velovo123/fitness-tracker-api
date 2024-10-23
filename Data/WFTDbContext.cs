@@ -1,17 +1,18 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using WorkoutFitnessTrackerAPI.Data.Configurations;
 using WorkoutFitnessTrackerAPI.Models;
 
 namespace WorkoutFitnessTrackerAPI.Data
 {
-    public class WFTDbContext : DbContext
+    public class WFTDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     {
         public WFTDbContext(DbContextOptions<WFTDbContext> options)
                     : base(options)
         {
         }
 
-        public DbSet<User> Users { get; set; }
         public DbSet<Workout> Workouts { get; set; }
         public DbSet<WorkoutExercise> WorkoutExercises { get; set; }
         public DbSet<Exercise> Exercises { get; set; }
@@ -28,6 +29,8 @@ namespace WorkoutFitnessTrackerAPI.Data
             modelBuilder.ApplyConfiguration(new WorkoutPlanExerciseConfiguration());
             modelBuilder.ApplyConfiguration(new ProgressRecordConfiguration());
             modelBuilder.ApplyConfiguration(new WorkoutConfiguration());
+
+            base.OnModelCreating(modelBuilder);
         }
     }
 }
