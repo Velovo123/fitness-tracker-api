@@ -166,7 +166,6 @@ namespace WorkoutFitnessTrackerAPI.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Type")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 

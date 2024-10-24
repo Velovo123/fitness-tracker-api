@@ -9,6 +9,8 @@ using WorkoutFitnessTrackerAPI.Repositories;
 using WorkoutFitnessTrackerAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
+using System.Data;
+using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,12 +69,11 @@ builder.Services.AddAuthentication(x =>
         ValidateLifetime = true,
     };
 });
-
+string connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")!;
 builder.Services.AddDbContext<WFTDbContext>(options =>
 {
-    options.UseSqlServer(Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"));
+    options.UseSqlServer(connectionString);
 });
-
 builder.Services.AddIdentityCore<User>(options =>
 {
     options.Password.RequireDigit = true;
@@ -85,6 +86,7 @@ builder.Services.AddIdentityCore<User>(options =>
 
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
 
 var app = builder.Build();
 
