@@ -18,9 +18,57 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             _exerciseService = exerciseService;
         }
 
-        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsAsync(Guid userId)
+        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsAsync(Guid userId, WorkoutQueryParams? queryParams = null)
         {
-            return await FetchWorkoutsAsync(userId);
+            var workoutsQuery = _context.Workouts
+                .Where(w => w.UserId == userId)
+                .Include(w => w.WorkoutExercises)
+                .ThenInclude(we => we.Exercise)
+                .AsQueryable();
+
+            if (queryParams != null)
+            {
+                if (queryParams.MinDuration.HasValue)
+                    workoutsQuery = workoutsQuery.Where(w => w.Duration >= queryParams.MinDuration.Value);
+
+                if (queryParams.MaxDuration.HasValue)
+                    workoutsQuery = workoutsQuery.Where(w => w.Duration <= queryParams.MaxDuration.Value);
+
+                if (queryParams.StartDate.HasValue)
+                    workoutsQuery = workoutsQuery.Where(w => w.Date >= queryParams.StartDate.Value);
+
+                if (queryParams.EndDate.HasValue)
+                {
+                    var endDate = queryParams.EndDate.Value.Date.AddDays(1).AddTicks(-1); 
+                    workoutsQuery = workoutsQuery.Where(w => w.Date <= endDate);
+                }
+
+                workoutsQuery = queryParams.SortBy?.ToLower() switch
+                {
+                    "duration" => queryParams.SortDescending == true ? workoutsQuery.OrderByDescending(w => w.Duration) : workoutsQuery.OrderBy(w => w.Duration),
+                    "date" => queryParams.SortDescending == true ? workoutsQuery.OrderByDescending(w => w.Date) : workoutsQuery.OrderBy(w => w.Date),
+                    _ => workoutsQuery.OrderBy(w => w.Date) 
+                };
+
+                workoutsQuery = workoutsQuery
+                    .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
+                    .Take(queryParams.PageSize ?? 10);
+            }
+
+            var workouts = await workoutsQuery
+                .Select(w => new WorkoutDto(
+                    w.Date,
+                    w.Duration,
+                    w.WorkoutExercises.Select(we => new WorkoutExerciseDto(
+                        we.Exercise.Name,
+                        we.Sets,
+                        we.Reps,
+                        we.Exercise.Type
+                    )).ToList()
+                ))
+                .ToListAsync();
+
+            return workouts;
         }
 
         public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
