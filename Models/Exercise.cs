@@ -10,7 +10,7 @@ namespace WorkoutFitnessTrackerAPI.Models
         [MaxLength(100)]
         public string Name { get; set; } = string.Empty;
         [MaxLength(100)]
-        public string Type { get; set; } = string.Empty;
+        public string? Type { get; set; } 
 
         public User? User { get; set; }
         public ICollection<WorkoutExercise> WorkoutExercises { get; set; } = [];

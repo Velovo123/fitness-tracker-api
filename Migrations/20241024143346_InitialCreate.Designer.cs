@@ -12,7 +12,7 @@ using WorkoutFitnessTrackerAPI.Data;
 namespace WorkoutFitnessTrackerAPI.Migrations
 {
     [DbContext(typeof(WFTDbContext))]
-    [Migration("20241023114912_InitialCreate")]
+    [Migration("20241024143346_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -169,7 +169,6 @@ namespace WorkoutFitnessTrackerAPI.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Type")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 

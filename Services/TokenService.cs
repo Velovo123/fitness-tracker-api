@@ -3,10 +3,11 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using WorkoutFitnessTrackerAPI.Models;
+using WorkoutFitnessTrackerAPI.Services.IServices;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
-    public class TokenService
+    public class TokenService : ITokenService
     {
         public string GenerateJwtToken(User user, IEnumerable<string> roles)
         {

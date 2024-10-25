@@ -22,13 +22,7 @@ namespace WorkoutFitnessTrackerAPI.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.ApplyConfiguration(new UserConfiguration());
-            modelBuilder.ApplyConfiguration(new WorkoutExerciseConfiguration());
-            modelBuilder.ApplyConfiguration(new ExerciseConfiguration());
-            modelBuilder.ApplyConfiguration(new WorkoutPlanConfiguration());
-            modelBuilder.ApplyConfiguration(new WorkoutPlanExerciseConfiguration());
-            modelBuilder.ApplyConfiguration(new ProgressRecordConfiguration());
-            modelBuilder.ApplyConfiguration(new WorkoutConfiguration());
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(WFTDbContext).Assembly);
 
             base.OnModelCreating(modelBuilder);
         }
