@@ -12,6 +12,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
     public class WorkoutController : ControllerBase
     {
         private readonly IWorkoutRepository _workoutRepository;
+
         public WorkoutController(IWorkoutRepository workoutRepository)
         {
             _workoutRepository = workoutRepository;
@@ -19,7 +20,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
 
         // /api/Workout
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<WorkoutDto>>> GetWorkouts()
+        public async Task<ActionResult<IEnumerable<WorkoutDto>>> GetWorkouts([FromQuery] WorkoutQueryParams? queryParams = null)
         {
             try
             {
@@ -32,7 +33,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
 
                 var userGuid = Guid.Parse(userId);
 
-                var workouts = await _workoutRepository.GetWorkoutsAsync(userGuid);
+                var workouts = await _workoutRepository.GetWorkoutsAsync(userGuid, queryParams!);
 
                 if (workouts == null || !workouts.Any())
                 {
