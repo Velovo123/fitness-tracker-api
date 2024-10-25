@@ -5,6 +5,7 @@ using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using WorkoutFitnessTrackerAPI.Services;
+using WorkoutFitnessTrackerAPI.Services.IServices;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
@@ -12,8 +13,8 @@ namespace WorkoutFitnessTrackerAPI.Repositories
     {
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
-        private readonly TokenService _tokenService;
-        public UserRepository(UserManager<User> userManager, SignInManager<User> signInManager, TokenService tokenService)
+        private readonly ITokenService _tokenService;
+        public UserRepository(UserManager<User> userManager, SignInManager<User> signInManager, ITokenService tokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;

@@ -37,12 +37,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
 
             return Ok(new { Message = "User registered successfully!" });
         }
-        /*
-         {
-    "email": "john@example.com",
-    "password": "Password123!"
-}
-         */
+        
         // POST: api/User/login
         [HttpPost("login")]
         [ProducesResponseType(StatusCodes.Status200OK)] 

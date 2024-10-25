@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 using System.Data;
 using Microsoft.Data.SqlClient;
+using WorkoutFitnessTrackerAPI.Services.IServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,7 +85,8 @@ builder.Services.AddIdentityCore<User>(options =>
 .AddEntityFrameworkStores<WFTDbContext>() 
 .AddSignInManager<SignInManager<User>>(); 
 
-builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<ITokenService,TokenService>();
+builder.Services.AddScoped<IExerciseService, ExerciseService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
 

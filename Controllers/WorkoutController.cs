@@ -17,6 +17,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
             _workoutRepository = workoutRepository;
         }
 
+        // /api/Workout
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkoutDto>>> GetWorkouts()
         {
@@ -50,6 +51,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
             }
         }
 
+        // /api/Workout
         [HttpPost]
         public async Task<ActionResult> SaveWorkout([FromBody] WorkoutDto workoutDto)
         {
@@ -75,6 +77,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
             }
         }
 
+        // /api/Workout/date/{date}
         [HttpGet("date/{date}")]
         public async Task<ActionResult<WorkoutDto>> GetWorkoutByDate(DateTime date)
         {
@@ -85,7 +88,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
 
             var userGuid = Guid.Parse(userId);
 
-            var workout = await _workoutRepository.GetWorkoutByDateAsync(userGuid, date);
+            var workout = await _workoutRepository.GetWorkoutsByDateAsync(userGuid, date);
 
             if (workout == null)
                 return NotFound($"No workout found for the date {date.ToShortDateString()}.");
@@ -93,6 +96,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
             return Ok(workout);
         }
 
+        // /api/Workout/date/{date}
         [HttpDelete("date/{date}")]
         public async Task<ActionResult> DeleteWorkout(DateTime date)
         {

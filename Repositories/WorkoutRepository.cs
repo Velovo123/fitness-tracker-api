@@ -1,145 +1,106 @@
-﻿using Dapper;
-using WorkoutFitnessTrackerAPI.Models.Dto_s;
+﻿using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
-using System.Data;
-using Microsoft.EntityFrameworkCore;
 using WorkoutFitnessTrackerAPI.Data;
 using WorkoutFitnessTrackerAPI.Models;
+using WorkoutFitnessTrackerAPI.Services.IServices;
+using Microsoft.EntityFrameworkCore;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
     public class WorkoutRepository : IWorkoutRepository
     {
         private readonly WFTDbContext _context;
+        private readonly IExerciseService _exerciseService;
 
-        public WorkoutRepository(WFTDbContext context)
+        public WorkoutRepository(WFTDbContext context, IExerciseService exerciseService)
         {
             _context = context;
-        }
-
-        public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
-        {
-            var workout = await _context.Workouts
-                .FirstOrDefaultAsync(w => w.UserId == userId && w.Date.Date == date.Date);
-
-            if (workout == null)
-                return false;
-
-            _context.Workouts.Remove(workout);
-            var result = await _context.SaveChangesAsync();
-
-            return result > 0;
-        }
-
-        public async Task<WorkoutDto?> GetWorkoutByDateAsync(Guid userId, DateTime date)
-        {
-            var workout = await _context.Workouts
-                .Include(w => w.WorkoutExercises)
-                .ThenInclude(we => we.Exercise)
-                .FirstOrDefaultAsync(w => w.UserId == userId && w.Date.Date == date.Date);
-
-            if (workout == null)
-                return null;
-
-            var workoutDto = new WorkoutDto(
-                workout.Date,
-                workout.Duration,
-                workout.WorkoutExercises.Select(we => new WorkoutExerciseDto(
-                    we.Exercise.Name,
-                    we.Sets,
-                    we.Reps,
-                    we.Exercise.Type
-                )).ToList()
-            );
-
-            return workoutDto;
+            _exerciseService = exerciseService;
         }
 
         public async Task<IEnumerable<WorkoutDto>> GetWorkoutsAsync(Guid userId)
         {
-            var workouts = await _context.Workouts
-                .Where(w => w.UserId == userId)
-                .Include(w => w.WorkoutExercises)            
-                    .ThenInclude(we => we.Exercise)          
-                .Select(w => new WorkoutDto(
-                    w.Date,                                   
-                    w.Duration,                               
-                    w.WorkoutExercises.Select(we => new WorkoutExerciseDto(
-                        we.Exercise.Name,                    
-                        we.Sets,                             
-                        we.Reps,
-                        we.Exercise.Type
-                    )).ToList()                              
-                ))
-                .ToListAsync();
+            return await FetchWorkoutsAsync(userId);
+        }
 
-            return workouts; 
+        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
+        {
+            return await FetchWorkoutsAsync(userId, date);
         }
 
         public async Task<bool> SaveWorkoutAsync(Guid userId, WorkoutDto workoutDto)
         {
-            var existingWorkout = await _context.Workouts
-                .Include(w => w.WorkoutExercises)
-                .FirstOrDefaultAsync(w => w.UserId == userId && w.Date.Date == workoutDto.Date.Date);
+            var standardizedDate = workoutDto.Date;
+            var existingWorkout = await FindWorkoutAsync(userId, standardizedDate);
 
-            var exercisesInWorkout = new List<WorkoutExercise>();
-            foreach (var exerciseDto in workoutDto.Exercises)
-            {
-                var exercise = await _context.Exercises
-                    .FirstOrDefaultAsync(ex => ex.Name == exerciseDto.ExerciseName && ex.UserId == userId);
-
-                if (exercise == null)
-                {
-                    exercise = new Exercise
-                    {
-                        Id = Guid.NewGuid(),   
-                        Name = exerciseDto.ExerciseName,
-                        UserId = userId
-                    };
-
-                    if (!string.IsNullOrEmpty(exerciseDto.Type))
-                    {
-                        exercise.Type = exerciseDto.Type;
-                    }
-
-                    _context.Exercises.Add(exercise);
-                    await _context.SaveChangesAsync();  
-                }
-
-                var workoutExercise = new WorkoutExercise
-                {
-                    ExerciseId = exercise.Id,   
-                    Sets = exerciseDto.Sets,
-                    Reps = exerciseDto.Reps
-                };
-                exercisesInWorkout.Add(workoutExercise);
-            }
+            var exercisesInWorkout = await _exerciseService.PrepareExercisesForWorkout(userId, workoutDto.Exercises);
 
             if (existingWorkout != null)
             {
-                existingWorkout.Duration = workoutDto.Duration;
-
-                _context.WorkoutExercises.RemoveRange(existingWorkout.WorkoutExercises);
-
-                existingWorkout.WorkoutExercises = exercisesInWorkout;
+                UpdateExistingWorkout(existingWorkout, workoutDto.Duration, exercisesInWorkout);
             }
             else
             {
-                var workout = new Workout
-                {
-                    UserId = userId,
-                    Date = workoutDto.Date,
-                    Duration = workoutDto.Duration,
-                    WorkoutExercises = exercisesInWorkout
-                };
-
-                _context.Workouts.Add(workout);
+                CreateNewWorkout(userId, standardizedDate, workoutDto.Duration, exercisesInWorkout);
             }
 
-            var result = await _context.SaveChangesAsync();
-            return result > 0;
+            return await _context.SaveChangesAsync() > 0;
         }
 
+        public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
+        {
+            var workout = await FindWorkoutAsync(userId, date);
+            if (workout == null) return false;
 
+            _context.Workouts.Remove(workout);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        private async Task<IEnumerable<WorkoutDto>> FetchWorkoutsAsync(Guid userId, DateTime? date = null)
+        {
+            var workoutsQuery = _context.Workouts
+                .Where(w => w.UserId == userId && (date == null || w.Date.Date == date.Value.Date))
+                .OrderBy(w => w.Date)
+                .Include(w => w.WorkoutExercises)
+                .ThenInclude(we => we.Exercise)
+                .Select(w => new WorkoutDto(
+                    w.Date,
+                    w.Duration,
+                    w.WorkoutExercises.Select(we => new WorkoutExerciseDto(
+                        we.Exercise.Name,
+                        we.Sets,
+                        we.Reps,
+                        we.Exercise.Type
+                    )).ToList()
+                ));
+
+            return await workoutsQuery.ToListAsync();
+        }
+
+        private async Task<Workout?> FindWorkoutAsync(Guid userId, DateTime date)
+        {
+            return await _context.Workouts
+                .Include(w => w.WorkoutExercises)
+                .FirstOrDefaultAsync(w => w.UserId == userId && w.Date == date);
+        }
+
+        private void UpdateExistingWorkout(Workout workout, int duration, List<WorkoutExercise> exercisesInWorkout)
+        {
+            workout.Duration = duration;
+            _context.WorkoutExercises.RemoveRange(workout.WorkoutExercises);
+            workout.WorkoutExercises = exercisesInWorkout;
+        }
+
+        private void CreateNewWorkout(Guid userId, DateTime date, int duration, List<WorkoutExercise> exercisesInWorkout)
+        {
+            var workout = new Workout
+            {
+                UserId = userId,
+                Date = date,
+                Duration = duration,
+                WorkoutExercises = exercisesInWorkout
+            };
+            _context.Workouts.Add(workout);
+        }
     }
 }
