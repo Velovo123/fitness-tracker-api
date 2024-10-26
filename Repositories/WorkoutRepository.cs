@@ -4,6 +4,8 @@ using WorkoutFitnessTrackerAPI.Data;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
+using AutoMapper;
+using System.Collections;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
@@ -11,11 +13,13 @@ namespace WorkoutFitnessTrackerAPI.Repositories
     {
         private readonly WFTDbContext _context;
         private readonly IExerciseService _exerciseService;
+        private readonly IMapper _mapper;
 
-        public WorkoutRepository(WFTDbContext context, IExerciseService exerciseService)
+        public WorkoutRepository(WFTDbContext context, IExerciseService exerciseService, IMapper mapper)
         {
             _context = context;
             _exerciseService = exerciseService;
+            _mapper = mapper;
         }
 
         public async Task<IEnumerable<WorkoutDto>> GetWorkoutsAsync(Guid userId, WorkoutQueryParams? queryParams = null)
@@ -39,7 +43,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
                 if (queryParams.EndDate.HasValue)
                 {
-                    var endDate = queryParams.EndDate.Value.Date.AddDays(1).AddTicks(-1); 
+                    var endDate = queryParams.EndDate.Value.Date.AddDays(1).AddTicks(-1);
                     workoutsQuery = workoutsQuery.Where(w => w.Date <= endDate);
                 }
 
@@ -47,28 +51,16 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 {
                     "duration" => queryParams.SortDescending == true ? workoutsQuery.OrderByDescending(w => w.Duration) : workoutsQuery.OrderBy(w => w.Duration),
                     "date" => queryParams.SortDescending == true ? workoutsQuery.OrderByDescending(w => w.Date) : workoutsQuery.OrderBy(w => w.Date),
-                    _ => workoutsQuery.OrderBy(w => w.Date) 
+                    _ => workoutsQuery.OrderBy(w => w.Date)
                 };
 
                 workoutsQuery = workoutsQuery
                     .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
                     .Take(queryParams.PageSize ?? 10);
             }
-
-            var workouts = await workoutsQuery
-                .Select(w => new WorkoutDto(
-                    w.Date,
-                    w.Duration,
-                    w.WorkoutExercises.Select(we => new WorkoutExerciseDto(
-                        we.Exercise.Name,
-                        we.Sets,
-                        we.Reps,
-                        we.Exercise.Type
-                    )).ToList()
-                ))
-                .ToListAsync();
-
-            return workouts;
+            _mapper.ConfigurationProvider.AssertConfigurationIsValid();
+            var workouts = await workoutsQuery.ToListAsync();
+            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts); 
         }
 
         public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
@@ -110,19 +102,10 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 .Where(w => w.UserId == userId && (date == null || w.Date.Date == date.Value.Date))
                 .OrderBy(w => w.Date)
                 .Include(w => w.WorkoutExercises)
-                .ThenInclude(we => we.Exercise)
-                .Select(w => new WorkoutDto(
-                    w.Date,
-                    w.Duration,
-                    w.WorkoutExercises.Select(we => new WorkoutExerciseDto(
-                        we.Exercise.Name,
-                        we.Sets,
-                        we.Reps,
-                        we.Exercise.Type
-                    )).ToList()
-                ));
+                .ThenInclude(we => we.Exercise);
 
-            return await workoutsQuery.ToListAsync();
+            var workouts = await workoutsQuery.ToListAsync();
+            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts); 
         }
 
         private async Task<Workout?> FindWorkoutAsync(Guid userId, DateTime date)

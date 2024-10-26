@@ -12,6 +12,8 @@ using Microsoft.OpenApi.Models;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using WorkoutFitnessTrackerAPI.Services.IServices;
+using Microsoft.AspNetCore.Hosting;
+using WorkoutFitnessTrackerAPI.Mappings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +91,7 @@ builder.Services.AddScoped<ITokenService,TokenService>();
 builder.Services.AddScoped<IExerciseService, ExerciseService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
+builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
 
 var app = builder.Build();
 
