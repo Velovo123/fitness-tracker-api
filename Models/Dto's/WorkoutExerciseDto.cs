@@ -2,20 +2,21 @@
 
 namespace WorkoutFitnessTrackerAPI.Models.Dto_s
 {
-    public record WorkoutExerciseDto(
+    public record WorkoutExerciseDto
+    {
         [Required(ErrorMessage = "Exercise name is required.")]
         [MaxLength(100, ErrorMessage = "Exercise name cannot exceed 100 characters.")]
-        string ExerciseName,
+        public string ExerciseName { get; init; }
 
         [Required(ErrorMessage = "Sets are required.")]
         [Range(1, 100, ErrorMessage = "Sets must be between 1 and 100.")]
-        int Sets,
+        public int Sets { get; init; }
 
         [Required(ErrorMessage = "Reps are required.")]
         [Range(1, 100, ErrorMessage = "Reps must be between 1 and 100.")]
-        int Reps,
+        public int Reps { get; init; }
 
         [MaxLength(50, ErrorMessage = "Type cannot exceed 50 characters.")]
-        string? Type = null
-    );
+        public string? Type { get; init; } = null;
+    }
 }
