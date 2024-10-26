@@ -22,7 +22,7 @@ namespace WorkoutFitnessTrackerAPI.Services
 
             foreach (var exerciseDto in exercises)
             {
-                var standardizedExerciseName = exerciseDto.ExerciseName.Trim().ToLower();
+                var standardizedExerciseName = NormalizeName(exerciseDto.ExerciseName);
 
                 var exercise = await _context.Exercises
                     .FirstOrDefaultAsync(ex => ex.Name == standardizedExerciseName && ex.UserId == userId);
@@ -32,7 +32,7 @@ namespace WorkoutFitnessTrackerAPI.Services
                     exercise = new Exercise
                     {
                         Id = Guid.NewGuid(),
-                        Name = standardizedExerciseName,
+                        Name = standardizedExerciseName,  
                         UserId = userId,
                         Type = exerciseDto is WorkoutExerciseDto workoutExerciseDto
                             ? workoutExerciseDto.Type
@@ -69,5 +69,11 @@ namespace WorkoutFitnessTrackerAPI.Services
 
             return preparedExercises;
         }
+
+        private static string NormalizeName(string name)
+        {
+            return string.Concat(name.ToLower().Where(char.IsLetterOrDigit));
+        }
+
     }
 }
