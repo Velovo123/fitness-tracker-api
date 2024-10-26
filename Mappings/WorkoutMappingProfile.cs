@@ -8,7 +8,6 @@ namespace WorkoutFitnessTrackerAPI.Mappings
     {
         public WorkoutMappingProfile()
         {
-            // Map Workout to WorkoutDto with Exercises resolved through the resolver
             CreateMap<Workout, WorkoutDto>()
                 .ForMember(dest => dest.Exercises, opt => opt.MapFrom(src =>
                     src.WorkoutExercises.Select(we => new WorkoutExerciseDto
@@ -20,7 +19,6 @@ namespace WorkoutFitnessTrackerAPI.Mappings
                     }).ToList()
                 ));
 
-            // Optional separate mapping for WorkoutExercise to WorkoutExerciseDto
             CreateMap<WorkoutExercise, WorkoutExerciseDto>()
                 .ForMember(dest => dest.ExerciseName, opt => opt.MapFrom(src => src.Exercise.Name))
                 .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Exercise.Type))

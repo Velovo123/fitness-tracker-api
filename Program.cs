@@ -9,11 +9,9 @@ using WorkoutFitnessTrackerAPI.Repositories;
 using WorkoutFitnessTrackerAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
-using System.Data;
-using Microsoft.Data.SqlClient;
 using WorkoutFitnessTrackerAPI.Services.IServices;
-using Microsoft.AspNetCore.Hosting;
-using WorkoutFitnessTrackerAPI.Mappings;
+using Microsoft.AspNetCore.WebSockets;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,7 +89,8 @@ builder.Services.AddScoped<ITokenService,TokenService>();
 builder.Services.AddScoped<IExerciseService, ExerciseService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
-builder.Services.AddAutoMapper(typeof(WorkoutMappingProfile));
+builder.Services.AddScoped<IWorkoutPlanRepository, WorkoutPlanRepository>();
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 var app = builder.Build();
 
