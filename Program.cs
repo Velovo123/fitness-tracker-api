@@ -91,7 +91,7 @@ builder.Services.AddScoped<ITokenService,TokenService>();
 builder.Services.AddScoped<IExerciseService, ExerciseService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
-builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
+builder.Services.AddAutoMapper(typeof(WorkoutMappingProfile));
 
 var app = builder.Build();
 

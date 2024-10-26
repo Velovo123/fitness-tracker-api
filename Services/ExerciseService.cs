@@ -3,6 +3,7 @@ using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
+using WorkoutFitnessTrackerAPI.Models.Dto_s.IDto_s;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
@@ -15,9 +16,9 @@ namespace WorkoutFitnessTrackerAPI.Services
             _context = context;
         }
 
-        public async Task<List<WorkoutExercise>> PrepareExercisesForWorkout(Guid userId, List<WorkoutExerciseDto> exercises)
+        public async Task<List<T>> PrepareExercises<T>(Guid userId, IEnumerable<IExerciseDto> exercises) where T : class, new()
         {
-            var workoutExercises = new List<WorkoutExercise>();
+            var preparedExercises = new List<T>();
 
             foreach (var exerciseDto in exercises)
             {
@@ -33,21 +34,40 @@ namespace WorkoutFitnessTrackerAPI.Services
                         Id = Guid.NewGuid(),
                         Name = standardizedExerciseName,
                         UserId = userId,
-                        Type = !string.IsNullOrEmpty(exerciseDto.Type) ? exerciseDto.Type : null
+                        Type = exerciseDto is WorkoutExerciseDto workoutExerciseDto
+                            ? workoutExerciseDto.Type
+                            : null
                     };
                     _context.Exercises.Add(exercise);
                     await _context.SaveChangesAsync();
                 }
 
-                workoutExercises.Add(new WorkoutExercise
+                T preparedExercise = null!;
+
+                if (typeof(T) == typeof(WorkoutExercise))
                 {
-                    ExerciseId = exercise.Id,
-                    Sets = exerciseDto.Sets,
-                    Reps = exerciseDto.Reps
-                });
+                    preparedExercise = (T)(object)new WorkoutExercise
+                    {
+                        ExerciseId = exercise.Id,
+                        Sets = exerciseDto.Sets,
+                        Reps = exerciseDto.Reps
+                    };
+                }
+                else if (typeof(T) == typeof(WorkoutPlanExercise))
+                {
+                    preparedExercise = (T)(object)new WorkoutPlanExercise
+                    {
+                        ExerciseId = exercise.Id,
+                        Sets = exerciseDto.Sets,
+                        Reps = exerciseDto.Reps
+                    };
+                }
+
+                if (preparedExercise != null)
+                    preparedExercises.Add(preparedExercise);
             }
 
-            return workoutExercises;
+            return preparedExercises;
         }
     }
 }

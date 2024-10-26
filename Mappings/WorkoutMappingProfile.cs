@@ -4,9 +4,9 @@ using WorkoutFitnessTrackerAPI.Models;
 
 namespace WorkoutFitnessTrackerAPI.Mappings
 {
-    public class AutoMapperProfile : Profile
+    public class WorkoutMappingProfile : Profile
     {
-        public AutoMapperProfile()
+        public WorkoutMappingProfile()
         {
             // Map Workout to WorkoutDto with Exercises resolved through the resolver
             CreateMap<Workout, WorkoutDto>()
