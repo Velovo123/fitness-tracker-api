@@ -5,7 +5,6 @@ using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
-using System.Collections;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
@@ -58,9 +57,10 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                     .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
                     .Take(queryParams.PageSize ?? 10);
             }
+
             _mapper.ConfigurationProvider.AssertConfigurationIsValid();
             var workouts = await workoutsQuery.ToListAsync();
-            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts); 
+            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts);
         }
 
         public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
@@ -73,7 +73,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             var standardizedDate = workoutDto.Date;
             var existingWorkout = await FindWorkoutAsync(userId, standardizedDate);
 
-            var exercisesInWorkout = await _exerciseService.PrepareExercisesForWorkout(userId, workoutDto.Exercises);
+            var exercisesInWorkout = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
 
             if (existingWorkout != null)
             {
@@ -105,7 +105,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 .ThenInclude(we => we.Exercise);
 
             var workouts = await workoutsQuery.ToListAsync();
-            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts); 
+            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts);
         }
 
         private async Task<Workout?> FindWorkoutAsync(Guid userId, DateTime date)
