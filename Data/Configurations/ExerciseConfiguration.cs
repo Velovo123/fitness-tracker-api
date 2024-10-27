@@ -25,6 +25,8 @@ namespace WorkoutFitnessTrackerAPI.Data.Configurations
                    .WithOne(pr => pr.Exercise)
                    .HasForeignKey(pr => pr.ExerciseId)
                    .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasIndex(e => e.Name).IsUnique();
         }
     }
 }

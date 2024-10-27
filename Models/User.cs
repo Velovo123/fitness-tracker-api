@@ -11,7 +11,7 @@ namespace WorkoutFitnessTrackerAPI.Models
 
         public ICollection<Workout> Workouts { get; set; } = [];
         public ICollection<WorkoutPlan> WorkoutPlans { get; set; } = [];
-        public ICollection<Exercise> Exercises { get; set; } = [];
+        public ICollection<UserExercise> UserExercises { get; set; } = []; 
         public ICollection<ProgressRecord> ProgressRecords { get; set; } = [];
     }
 }

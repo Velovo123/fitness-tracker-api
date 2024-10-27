@@ -25,7 +25,7 @@ namespace WorkoutFitnessTrackerAPI.Services
                 var standardizedExerciseName = NormalizeName(exerciseDto.ExerciseName);
 
                 var exercise = await _context.Exercises
-                    .FirstOrDefaultAsync(ex => ex.Name == standardizedExerciseName && ex.UserId == userId);
+                    .FirstOrDefaultAsync(ex => ex.Name == standardizedExerciseName);
 
                 if (exercise == null)
                 {
@@ -33,7 +33,6 @@ namespace WorkoutFitnessTrackerAPI.Services
                     {
                         Id = Guid.NewGuid(),
                         Name = standardizedExerciseName,  
-                        UserId = userId,
                         Type = exerciseDto is WorkoutExerciseDto workoutExerciseDto
                             ? workoutExerciseDto.Type
                             : null
