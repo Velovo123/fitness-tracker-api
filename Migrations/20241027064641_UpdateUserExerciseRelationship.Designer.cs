@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WorkoutFitnessTrackerAPI.Data;
 
@@ -11,9 +12,11 @@ using WorkoutFitnessTrackerAPI.Data;
 namespace WorkoutFitnessTrackerAPI.Migrations
 {
     [DbContext(typeof(WFTDbContext))]
-    partial class WFTDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241027064641_UpdateUserExerciseRelationship")]
+    partial class UpdateUserExerciseRelationship
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

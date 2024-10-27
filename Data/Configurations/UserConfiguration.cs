@@ -9,7 +9,6 @@ namespace WorkoutFitnessTrackerAPI.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<User> builder)
         {
-
             builder.HasMany(u => u.Workouts)
                    .WithOne(w => w.User)
                    .HasForeignKey(w => w.UserId)
@@ -19,11 +18,6 @@ namespace WorkoutFitnessTrackerAPI.Data.Configurations
                    .WithOne(wp => wp.User)
                    .HasForeignKey(wp => wp.UserId)
                    .OnDelete(DeleteBehavior.Cascade);
-
-            builder.HasMany(u => u.Exercises)
-                   .WithOne(e => e.User)
-                   .HasForeignKey(e => e.UserId)
-                   .OnDelete(DeleteBehavior.SetNull);
 
             builder.HasMany(u => u.ProgressRecords)
                    .WithOne(pr => pr.User)
