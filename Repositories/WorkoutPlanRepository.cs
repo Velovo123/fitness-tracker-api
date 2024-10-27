@@ -5,6 +5,7 @@ using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
+using WorkoutFitnessTrackerAPI.Helpers;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
@@ -31,36 +32,26 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
             if (queryParams != null)
             {
-                plansQuery = queryParams.SortBy?.ToLower() switch
-                {
-                    "name" => queryParams.SortDescending == true ? plansQuery.OrderByDescending(wp => wp.Name) : plansQuery.OrderBy(wp => wp.Name),
-                    _ => plansQuery.OrderBy(wp => wp.Name)
-                };
-
-                plansQuery = plansQuery
-                    .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
-                    .Take(queryParams.PageSize ?? 10);
+                plansQuery = ApplySortingAndPaging(plansQuery, queryParams);
             }
 
-            _mapper.ConfigurationProvider.AssertConfigurationIsValid();
             var plans = await plansQuery.ToListAsync();
             return _mapper.Map<IEnumerable<WorkoutPlanDto>>(plans);
         }
 
         public async Task<WorkoutPlanDto?> GetWorkoutPlanByNameAsync(Guid userId, string planName)
         {
-            var normalizedPlanName = planName.Trim().ToLower();
-            var plan = await _context.WorkoutPlans
-                .Include(wp => wp.WorkoutPlanExercises)
-                .ThenInclude(wpe => wpe.Exercise)
-                .FirstOrDefaultAsync(wp => wp.UserId == userId && wp.Name == normalizedPlanName);
-
+            var normalizedPlanName = NameNormalizationHelper.NormalizeName(planName);
+            var plan = await FindWorkoutPlanByName(userId, normalizedPlanName);
             return plan == null ? null : _mapper.Map<WorkoutPlanDto>(plan);
         }
 
         public async Task<bool> SaveWorkoutPlanAsync(Guid userId, WorkoutPlanDto workoutPlanDto, bool overwrite = false)
         {
-            var existingPlan = await FindWorkoutPlanAsync(userId, workoutPlanDto.Name);
+            var normalizedPlanName = NameNormalizationHelper.NormalizeName(workoutPlanDto.Name);
+            var existingPlan = await FindWorkoutPlanByName(userId, normalizedPlanName);
+
+            var exercisesInPlan = await _exerciseService.PrepareExercises<WorkoutPlanExercise>(userId, workoutPlanDto.Exercises);
 
             if (existingPlan != null)
             {
@@ -68,14 +59,11 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 {
                     throw new InvalidOperationException("A workout plan with this name already exists. Confirm overwrite.");
                 }
-
-                var exercisesInPlan = await _exerciseService.PrepareExercises<WorkoutPlanExercise>(userId, workoutPlanDto.Exercises);
                 UpdateExistingWorkoutPlan(existingPlan, workoutPlanDto.Goal, exercisesInPlan);
             }
             else
             {
-                var exercisesInPlan = await _exerciseService.PrepareExercises<WorkoutPlanExercise>(userId, workoutPlanDto.Exercises);
-                CreateNewWorkoutPlan(userId, workoutPlanDto.Name, workoutPlanDto.Goal, exercisesInPlan);
+                CreateNewWorkoutPlan(userId, normalizedPlanName, workoutPlanDto.Goal, exercisesInPlan);
             }
 
             return await _context.SaveChangesAsync() > 0;
@@ -83,18 +71,32 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
         public async Task<bool> DeleteWorkoutPlanAsync(Guid userId, string planName)
         {
-            var normalizedPlanName = planName.Trim().ToLower();
-            var plan = await FindWorkoutPlanAsync(userId, normalizedPlanName);
+            var normalizedPlanName = NameNormalizationHelper.NormalizeName(planName);
+            var plan = await FindWorkoutPlanByName(userId, normalizedPlanName);
             if (plan == null) return false;
 
             _context.WorkoutPlans.Remove(plan);
             return await _context.SaveChangesAsync() > 0;
         }
 
-        private async Task<WorkoutPlan?> FindWorkoutPlanAsync(Guid userId, string normalizedPlanName)
+        private IQueryable<WorkoutPlan> ApplySortingAndPaging(IQueryable<WorkoutPlan> query, WorkoutPlanQueryParams queryParams)
+        {
+            query = queryParams.SortBy?.ToLower() switch
+            {
+                "name" => queryParams.SortDescending == true ? query.OrderByDescending(wp => wp.Name) : query.OrderBy(wp => wp.Name),
+                _ => query.OrderBy(wp => wp.Name)
+            };
+
+            return query
+                .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
+                .Take(queryParams.PageSize ?? 10);
+        }
+
+        private async Task<WorkoutPlan?> FindWorkoutPlanByName(Guid userId, string normalizedPlanName)
         {
             return await _context.WorkoutPlans
                 .Include(wp => wp.WorkoutPlanExercises)
+                .ThenInclude(wpe => wpe.Exercise)
                 .FirstOrDefaultAsync(wp => wp.UserId == userId && wp.Name == normalizedPlanName);
         }
 
