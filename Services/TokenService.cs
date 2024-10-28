@@ -12,7 +12,8 @@ namespace WorkoutFitnessTrackerAPI.Services
         public string GenerateJwtToken(User user, IEnumerable<string> roles)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(Environment.GetEnvironmentVariable("JWT_SECRET")!);
+            var key = Encoding.ASCII.GetBytes(Environment.GetEnvironmentVariable("JWT_SECRET") 
+                ?? throw new InvalidOperationException("JWT_SECRET not configured."));
 
             var claims = new List<Claim>
             {
@@ -27,7 +28,7 @@ namespace WorkoutFitnessTrackerAPI.Services
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddHours(2), 
+                Expires = DateTime.UtcNow.AddMinutes(Convert.ToDouble(Environment.GetEnvironmentVariable("JWT_EXPIRY") ?? "120")), 
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 

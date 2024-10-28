@@ -1,8 +1,10 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Identity;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
+using WorkoutFitnessTrackerAPI.Models.Dto_s.User;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using WorkoutFitnessTrackerAPI.Services;
 using WorkoutFitnessTrackerAPI.Services.IServices;
@@ -14,21 +16,25 @@ namespace WorkoutFitnessTrackerAPI.Repositories
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
         private readonly ITokenService _tokenService;
-        public UserRepository(UserManager<User> userManager, SignInManager<User> signInManager, ITokenService tokenService)
+        private readonly IMapper _mapper;
+        public UserRepository(UserManager<User> userManager, SignInManager<User> signInManager, ITokenService tokenService, IMapper mapper)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _tokenService = tokenService;
+            _mapper = mapper;
         }
 
-        public async Task<User?> GetUserByEmailAsync(string email)
+        public async Task<UserProfileDto?> GetUserByEmailAsync(string email)
         {
-            return await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.FindByEmailAsync(email);
+            return user == null ? null : _mapper.Map<UserProfileDto>(user);
         }
 
-        public async Task<User?> GetUserByIdAsync(Guid id)
+        public async Task<UserProfileDto?> GetUserByIdAsync(Guid id)
         {
-            return await _userManager.FindByIdAsync(id.ToString());
+            var user =  await _userManager.FindByIdAsync(id.ToString());
+            return user == null ? null : _mapper.Map<UserProfileDto>(user);
         }
 
         public async Task<AuthResult> LoginUserAsync(UserLoginDto loginDto)
@@ -68,15 +74,28 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
             var result = await _userManager.CreateAsync(user, registrationDto.Password);
 
-            if (result.Succeeded) 
+            if (result.Succeeded)
             {
+                var roleResult = await _userManager.AddToRoleAsync(user, "User");
+
+                if (!roleResult.Succeeded)
+                {
+                    await _userManager.DeleteAsync(user);
+
+                    return new AuthResult(
+                        Success: false,
+                        Errors: roleResult.Errors.Select(e => e.Description).ToList()
+                    );
+                }
+
                 return new AuthResult(Success: true);
             }
 
             return new AuthResult(
-                Success: false, 
+                Success: false,
                 Errors: result.Errors.Select(e => e.Description).ToList()
             );
         }
+
     }
 }
