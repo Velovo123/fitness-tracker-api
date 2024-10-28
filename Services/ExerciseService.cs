@@ -38,6 +38,32 @@ namespace WorkoutFitnessTrackerAPI.Services
             return preparedExercises;
         }
 
+        public async Task<Exercise> GetExerciseByNormalizedNameAsync(string exerciseName)
+        {
+            var normalizedExerciseName = NameNormalizationHelper.NormalizeName(exerciseName);
+            return await _context.Exercises.FirstOrDefaultAsync(ex => ex.Name == normalizedExerciseName);
+        }
+
+        public async Task<bool> EnsureUserExerciseLinkAsync(Guid userId, Guid exerciseId)
+        {
+            var userExerciseLinkExists = await _context.UserExercises
+                .AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == exerciseId);
+
+            if (!userExerciseLinkExists)
+            {
+                _context.UserExercises.Add(new UserExercise
+                {
+                    UserId = userId,
+                    ExerciseId = exerciseId
+                });
+
+                await _context.SaveChangesAsync();
+                return true;
+            }
+
+            return false;
+        }
+
         private async Task<Exercise> GetOrCreateExerciseAsync(string standardizedExerciseName, IExerciseDto exerciseDto)
         {
             var exercise = await _context.Exercises
@@ -57,23 +83,6 @@ namespace WorkoutFitnessTrackerAPI.Services
             }
 
             return exercise;
-        }
-
-        private async Task EnsureUserExerciseLinkAsync(Guid userId, Guid exerciseId)
-        {
-            var userExerciseLinkExists = await _context.UserExercises
-                .AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == exerciseId);
-
-            if (!userExerciseLinkExists)
-            {
-                _context.UserExercises.Add(new UserExercise
-                {
-                    UserId = userId,
-                    ExerciseId = exerciseId
-                });
-
-                await _context.SaveChangesAsync();
-            }
         }
 
         private static T? CreateExerciseInstance<T>(Guid exerciseId, IExerciseDto exerciseDto) where T : class, new()
@@ -98,6 +107,6 @@ namespace WorkoutFitnessTrackerAPI.Services
             }
 
             return null;
-        }  
+        }
     }
 }
