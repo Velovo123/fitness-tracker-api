@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 
@@ -68,15 +69,18 @@ namespace WorkoutFitnessTrackerAPI.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetUserProfile()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); 
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            var user = await _userRepository.GetUserByIdAsync(Guid.Parse(userId!));
-            if (user == null)
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized("User ID is missing from the token.");
+
+            var userProfile = await _userRepository.GetUserByIdAsync(Guid.Parse(userId));
+            if (userProfile == null)
             {
                 return NotFound(new { Message = "User not found" });
             }
 
-            return Ok(new { user.Name, user.Email });
+            return Ok(userProfile);
         }
 
         // GET: api/User/by-email/{email}
@@ -94,7 +98,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
                 return NotFound(new { Message = "User not found" });
             }
 
-            return Ok(new { user.Name, user.Email });
+            return Ok(user);
         }
     }
 }

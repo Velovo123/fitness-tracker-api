@@ -10,8 +10,7 @@ using WorkoutFitnessTrackerAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
-using Microsoft.AspNetCore.WebSockets;
-
+using WorkoutFitnessTrackerAPI.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,11 +69,13 @@ builder.Services.AddAuthentication(x =>
         ValidateLifetime = true,
     };
 });
+
 string connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")!;
 builder.Services.AddDbContext<WFTDbContext>(options =>
 {
     options.UseSqlServer(connectionString);
 });
+
 builder.Services.AddIdentityCore<User>(options =>
 {
     options.Password.RequireDigit = true;
@@ -82,10 +83,10 @@ builder.Services.AddIdentityCore<User>(options =>
     options.Password.RequireUppercase = true;
 })
 .AddRoles<IdentityRole<Guid>>()
-.AddEntityFrameworkStores<WFTDbContext>() 
-.AddSignInManager<SignInManager<User>>(); 
+.AddEntityFrameworkStores<WFTDbContext>()
+.AddSignInManager<SignInManager<User>>();
 
-builder.Services.AddScoped<ITokenService,TokenService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IExerciseService, ExerciseService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
@@ -95,6 +96,20 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        await RoleSeeder.SeedRolesAsync(services);
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while seeding roles.");
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -103,8 +118,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication();  
-app.UseAuthorization();   
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

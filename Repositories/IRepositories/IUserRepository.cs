@@ -1,5 +1,6 @@
 ﻿using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
+using WorkoutFitnessTrackerAPI.Models.Dto_s.User;
 
 namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
 {
@@ -7,7 +8,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
     {
         Task<AuthResult> RegisterUserAsync(UserRegistrationDto registrationDto);
         Task<AuthResult> LoginUserAsync(UserLoginDto loginDto);
-        Task<User?> GetUserByEmailAsync(string email);
-        Task<User?> GetUserByIdAsync(Guid userId);
+        Task<UserProfileDto?> GetUserByEmailAsync(string email);
+        Task<UserProfileDto?> GetUserByIdAsync(Guid userId);
     }
 }
