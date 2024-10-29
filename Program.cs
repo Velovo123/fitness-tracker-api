@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using WorkoutFitnessTrackerAPI.Helpers;
+using WorkoutFitnessTrackerAPI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,6 +96,8 @@ builder.Services.AddScoped<IProgressRecordRepository, ProgressRecordRepository>(
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 using (var scope = app.Services.CreateScope())
 {

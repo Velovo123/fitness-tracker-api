@@ -21,44 +21,19 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsAsync(Guid userId, WorkoutQueryParams? queryParams = null)
+        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsAsync(Guid userId, WorkoutQueryParams queryParams)
         {
             var workoutsQuery = _context.Workouts
                 .Where(w => w.UserId == userId)
+                .AsNoTracking()
                 .Include(w => w.WorkoutExercises)
                 .ThenInclude(we => we.Exercise)
                 .AsQueryable();
 
-            if (queryParams != null)
-            {
-                if (queryParams.MinDuration.HasValue)
-                    workoutsQuery = workoutsQuery.Where(w => w.Duration >= queryParams.MinDuration.Value);
+            workoutsQuery = ApplyFilters(workoutsQuery, queryParams);
+            workoutsQuery = ApplySorting(workoutsQuery, queryParams);
+            workoutsQuery = ApplyPaging(workoutsQuery, queryParams);
 
-                if (queryParams.MaxDuration.HasValue)
-                    workoutsQuery = workoutsQuery.Where(w => w.Duration <= queryParams.MaxDuration.Value);
-
-                if (queryParams.StartDate.HasValue)
-                    workoutsQuery = workoutsQuery.Where(w => w.Date >= queryParams.StartDate.Value);
-
-                if (queryParams.EndDate.HasValue)
-                {
-                    var endDate = queryParams.EndDate.Value.Date.AddDays(1).AddTicks(-1);
-                    workoutsQuery = workoutsQuery.Where(w => w.Date <= endDate);
-                }
-
-                workoutsQuery = queryParams.SortBy?.ToLower() switch
-                {
-                    "duration" => queryParams.SortDescending == true ? workoutsQuery.OrderByDescending(w => w.Duration) : workoutsQuery.OrderBy(w => w.Duration),
-                    "date" => queryParams.SortDescending == true ? workoutsQuery.OrderByDescending(w => w.Date) : workoutsQuery.OrderBy(w => w.Date),
-                    _ => workoutsQuery.OrderBy(w => w.Date)
-                };
-
-                workoutsQuery = workoutsQuery
-                    .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
-                    .Take(queryParams.PageSize ?? 10);
-            }
-
-            _mapper.ConfigurationProvider.AssertConfigurationIsValid();
             var workouts = await workoutsQuery.ToListAsync();
             return _mapper.Map<IEnumerable<WorkoutDto>>(workouts);
         }
@@ -68,7 +43,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             return await FetchWorkoutsAsync(userId, date);
         }
 
-        public async Task<bool> SaveWorkoutAsync(Guid userId, WorkoutDto workoutDto)
+        public async Task<bool> SaveWorkoutAsync(Guid userId, WorkoutDto workoutDto, bool overwrite = false)
         {
             var standardizedDate = workoutDto.Date;
             var existingWorkout = await FindWorkoutAsync(userId, standardizedDate);
@@ -77,6 +52,10 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
             if (existingWorkout != null)
             {
+                if (!overwrite)
+                {
+                    throw new InvalidOperationException("A workout already exists for this date. Confirm overwrite.");
+                }
                 UpdateExistingWorkout(existingWorkout, workoutDto.Duration, exercisesInWorkout);
             }
             else
@@ -100,6 +79,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories
         {
             var workoutsQuery = _context.Workouts
                 .Where(w => w.UserId == userId && (date == null || w.Date.Date == date.Value.Date))
+                .AsNoTracking()
                 .OrderBy(w => w.Date)
                 .Include(w => w.WorkoutExercises)
                 .ThenInclude(we => we.Exercise);
@@ -132,6 +112,32 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 WorkoutExercises = exercisesInWorkout
             };
             _context.Workouts.Add(workout);
+        }
+
+        private IQueryable<Workout> ApplyFilters(IQueryable<Workout> query, WorkoutQueryParams queryParams)
+        {
+            if (queryParams.MinDuration.HasValue) query = query.Where(w => w.Duration >= queryParams.MinDuration.Value);
+            if (queryParams.MaxDuration.HasValue) query = query.Where(w => w.Duration <= queryParams.MaxDuration.Value);
+            if (queryParams.StartDate.HasValue) query = query.Where(w => w.Date >= queryParams.StartDate.Value);
+            if (queryParams.EndDate.HasValue) query = query.Where(w => w.Date <= queryParams.EndDate.Value);
+
+            return query;
+        }
+
+        private IQueryable<Workout> ApplySorting(IQueryable<Workout> query, WorkoutQueryParams queryParams)
+        {
+            return queryParams.SortBy?.ToLower() switch
+            {
+                "duration" => queryParams.SortDescending == true ? query.OrderByDescending(w => w.Duration) : query.OrderBy(w => w.Duration),
+                "date" => queryParams.SortDescending == true ? query.OrderByDescending(w => w.Date) : query.OrderBy(w => w.Date),
+                _ => query.OrderBy(w => w.Date)
+            };
+        }
+
+        private IQueryable<Workout> ApplyPaging(IQueryable<Workout> query, WorkoutQueryParams queryParams)
+        {
+            return query.Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
+                        .Take(queryParams.PageSize ?? 10);
         }
     }
 }
