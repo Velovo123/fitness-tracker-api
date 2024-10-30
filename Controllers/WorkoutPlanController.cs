@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 
@@ -9,7 +10,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class WorkoutPlanController : ControllerBase
+    public class WorkoutPlanController : BaseApiController
     {
         private readonly IWorkoutPlanRepository _workoutPlanRepository;
 
@@ -20,104 +21,74 @@ namespace WorkoutFitnessTrackerAPI.Controllers
 
         // /api/WorkoutPlan
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<WorkoutPlanDto>>> GetWorkoutPlans([FromQuery] WorkoutPlanQueryParams? queryParams = null)
+        [ResponseCache(Duration = 60)]
+        public async Task<ActionResult<ResponseWrapper<IEnumerable<WorkoutPlanDto>>>> GetWorkoutPlans([FromQuery] WorkoutPlanQueryParams queryParams)
         {
-            try
-            {
-                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
 
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized("User ID is missing from the token.");
-                }
+            var userGuid = Guid.Parse(userId);
+            var workoutPlans = await _workoutPlanRepository.GetWorkoutPlansAsync(userGuid, queryParams);
 
-                var userGuid = Guid.Parse(userId);
-
-                var workoutPlans = await _workoutPlanRepository.GetWorkoutPlansAsync(userGuid, queryParams!);
-
-                if (workoutPlans == null || !workoutPlans.Any())
-                {
-                    return NotFound("No workout plans found for this user.");
-                }
-
-                return Ok(workoutPlans);
-            }
-            catch (FormatException)
-            {
-                return BadRequest("Invalid user ID format.");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, "Internal server error: " + ex.Message);
-            }
+            return workoutPlans == null || !workoutPlans.Any()
+                ? NotFound(new ResponseWrapper<IEnumerable<WorkoutPlanDto>>(false, null, "No workout plans found for this user."))
+                : WrapResponse(true, workoutPlans, "Workout plans retrieved successfully.");
         }
 
         // /api/WorkoutPlan
         [HttpPost]
-        public async Task<ActionResult> SaveWorkoutPlan([FromBody] WorkoutPlanDto workoutPlanDto, [FromQuery] bool overwrite = false)
+        public async Task<ActionResult<ResponseWrapper<string>>> SaveWorkoutPlan([FromBody] WorkoutPlanDto workoutPlanDto, [FromQuery] bool overwrite = false)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+                return BadRequest(new ResponseWrapper<string>(false, null, string.Join(", ", errors)));
+            }
 
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId))
-                return Unauthorized("User ID is missing from the token.");
+                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
 
             var userGuid = Guid.Parse(userId);
+            var result = await _workoutPlanRepository.SaveWorkoutPlanAsync(userGuid, workoutPlanDto, overwrite);
 
-            try
-            {
-                var result = await _workoutPlanRepository.SaveWorkoutPlanAsync(userGuid, workoutPlanDto, overwrite);
-
-                if (result)
-                    return Ok("Workout plan saved successfully.");
-                else
-                    return BadRequest("Failed to save the workout plan.");
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Conflict(ex.Message);  
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
+            return result
+                ? WrapResponse(true, "Workout plan saved successfully.", "Workout plan saved successfully.")
+                : WrapResponse<string>(false, null, "Failed to save the workout plan.");
         }
 
         // /api/WorkoutPlan/name/{name}
         [HttpGet("name/{name}")]
-        public async Task<ActionResult<WorkoutPlanDto>> GetWorkoutPlanByName(string name)
+        [ResponseCache(Duration = 30)]
+        public async Task<ActionResult<ResponseWrapper<WorkoutPlanDto>>> GetWorkoutPlanByName(string name)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
             if (string.IsNullOrEmpty(userId))
-                return Unauthorized("User ID is missing from the token.");
+                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
 
             var userGuid = Guid.Parse(userId);
-
             var workoutPlan = await _workoutPlanRepository.GetWorkoutPlanByNameAsync(userGuid, name);
 
-            if (workoutPlan == null)
-                return NotFound($"No workout plan found with the name {name}.");
-
-            return Ok(workoutPlan);
+            return workoutPlan == null
+                ? NotFound(new ResponseWrapper<WorkoutPlanDto>(false, null, $"No workout plan found with the name {name}."))
+                : WrapResponse(true, workoutPlan, "Workout plan retrieved successfully.");
         }
 
         // /api/WorkoutPlan/name/{name}
         [HttpDelete("name/{name}")]
-        public async Task<ActionResult> DeleteWorkoutPlan(string name)
+        public async Task<ActionResult<ResponseWrapper<string>>> DeleteWorkoutPlan(string name)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
             if (string.IsNullOrEmpty(userId))
-                return Unauthorized("User ID is missing from the token.");
+                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
 
             var userGuid = Guid.Parse(userId);
-
             var result = await _workoutPlanRepository.DeleteWorkoutPlanAsync(userGuid, name);
 
-            if (!result)
-                return NotFound($"No workout plan found with the name {name} to delete.");
-
-            return Ok($"Workout plan '{name}' deleted successfully.");
+            return result
+                ? WrapResponse(true, $"Workout plan '{name}' deleted successfully.", "Workout plan deleted successfully.")
+                : NotFound(new ResponseWrapper<string>(false, null, $"No workout plan found with the name {name} to delete."));
         }
     }
 }

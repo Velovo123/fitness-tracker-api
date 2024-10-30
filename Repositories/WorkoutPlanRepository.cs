@@ -1,10 +1,10 @@
-﻿using AutoMapper;
-using WorkoutFitnessTrackerAPI.Data;
-using WorkoutFitnessTrackerAPI.Models.Dto_s;
-using WorkoutFitnessTrackerAPI.Models;
+﻿using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
+using WorkoutFitnessTrackerAPI.Data;
+using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
+using AutoMapper;
 using WorkoutFitnessTrackerAPI.Helpers;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
@@ -22,7 +22,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<WorkoutPlanDto>> GetWorkoutPlansAsync(Guid userId, WorkoutPlanQueryParams? queryParams = null)
+        public async Task<IEnumerable<WorkoutPlanDto>> GetWorkoutPlansAsync(Guid userId, WorkoutPlanQueryParams queryParams)
         {
             var plansQuery = _context.WorkoutPlans
                 .Where(wp => wp.UserId == userId)
@@ -30,10 +30,9 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 .ThenInclude(wpe => wpe.Exercise)
                 .AsQueryable();
 
-            if (queryParams != null)
-            {
-                plansQuery = ApplySortingAndPaging(plansQuery, queryParams);
-            }
+            plansQuery = ApplyFilters(plansQuery, queryParams);
+            plansQuery = ApplySorting(plansQuery, queryParams);
+            plansQuery = ApplyPaging(plansQuery, queryParams);
 
             var plans = await plansQuery.ToListAsync();
             return _mapper.Map<IEnumerable<WorkoutPlanDto>>(plans);
@@ -79,17 +78,27 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             return await _context.SaveChangesAsync() > 0;
         }
 
-        private IQueryable<WorkoutPlan> ApplySortingAndPaging(IQueryable<WorkoutPlan> query, WorkoutPlanQueryParams queryParams)
+        private IQueryable<WorkoutPlan> ApplyFilters(IQueryable<WorkoutPlan> query, WorkoutPlanQueryParams queryParams)
         {
-            query = queryParams.SortBy?.ToLower() switch
+            if (!string.IsNullOrEmpty(queryParams.Goal))
+                query = query.Where(wp => wp.Goal == queryParams.Goal);
+
+            return query;
+        }
+
+        private IQueryable<WorkoutPlan> ApplySorting(IQueryable<WorkoutPlan> query, WorkoutPlanQueryParams queryParams)
+        {
+            return queryParams.SortBy?.ToLower() switch
             {
                 "name" => queryParams.SortDescending == true ? query.OrderByDescending(wp => wp.Name) : query.OrderBy(wp => wp.Name),
                 _ => query.OrderBy(wp => wp.Name)
             };
+        }
 
-            return query
-                .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
-                .Take(queryParams.PageSize ?? 10);
+        private IQueryable<WorkoutPlan> ApplyPaging(IQueryable<WorkoutPlan> query, WorkoutPlanQueryParams queryParams)
+        {
+            return query.Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
+                        .Take(queryParams.PageSize ?? 10);
         }
 
         private async Task<WorkoutPlan?> FindWorkoutPlanByName(Guid userId, string normalizedPlanName)
