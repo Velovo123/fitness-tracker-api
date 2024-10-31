@@ -14,5 +14,7 @@ namespace WorkoutFitnessTrackerAPI.Models.Dto_s
         public string? SortBy { get; set; }
 
         public bool? SortDescending { get; set; } = false;
+
+        public string? Goal { get; init; }
     }
 }

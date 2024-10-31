@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
@@ -19,16 +18,16 @@ namespace WorkoutFitnessTrackerAPI.Controllers
             _workoutPlanRepository = workoutPlanRepository;
         }
 
-        // /api/WorkoutPlan
         [HttpGet]
         [ResponseCache(Duration = 60)]
         public async Task<ActionResult<ResponseWrapper<IEnumerable<WorkoutPlanDto>>>> GetWorkoutPlans([FromQuery] WorkoutPlanQueryParams queryParams)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
-
-            var userGuid = Guid.Parse(userId);
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+                return BadRequest(new ResponseWrapper<string>(false, null, string.Join("; ", errors)));
+            }
+            var userGuid = GetUserId();
             var workoutPlans = await _workoutPlanRepository.GetWorkoutPlansAsync(userGuid, queryParams);
 
             return workoutPlans == null || !workoutPlans.Any()
@@ -36,7 +35,6 @@ namespace WorkoutFitnessTrackerAPI.Controllers
                 : WrapResponse(true, workoutPlans, "Workout plans retrieved successfully.");
         }
 
-        // /api/WorkoutPlan
         [HttpPost]
         public async Task<ActionResult<ResponseWrapper<string>>> SaveWorkoutPlan([FromBody] WorkoutPlanDto workoutPlanDto, [FromQuery] bool overwrite = false)
         {
@@ -46,11 +44,7 @@ namespace WorkoutFitnessTrackerAPI.Controllers
                 return BadRequest(new ResponseWrapper<string>(false, null, string.Join(", ", errors)));
             }
 
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
-
-            var userGuid = Guid.Parse(userId);
+            var userGuid = GetUserId();
             var result = await _workoutPlanRepository.SaveWorkoutPlanAsync(userGuid, workoutPlanDto, overwrite);
 
             return result
@@ -58,16 +52,11 @@ namespace WorkoutFitnessTrackerAPI.Controllers
                 : WrapResponse<string>(false, null, "Failed to save the workout plan.");
         }
 
-        // /api/WorkoutPlan/name/{name}
         [HttpGet("name/{name}")]
         [ResponseCache(Duration = 30)]
         public async Task<ActionResult<ResponseWrapper<WorkoutPlanDto>>> GetWorkoutPlanByName(string name)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
-
-            var userGuid = Guid.Parse(userId);
+            var userGuid = GetUserId();
             var workoutPlan = await _workoutPlanRepository.GetWorkoutPlanByNameAsync(userGuid, name);
 
             return workoutPlan == null
@@ -75,15 +64,10 @@ namespace WorkoutFitnessTrackerAPI.Controllers
                 : WrapResponse(true, workoutPlan, "Workout plan retrieved successfully.");
         }
 
-        // /api/WorkoutPlan/name/{name}
         [HttpDelete("name/{name}")]
         public async Task<ActionResult<ResponseWrapper<string>>> DeleteWorkoutPlan(string name)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized(new ResponseWrapper<string>(false, null, "User ID is missing from the token."));
-
-            var userGuid = Guid.Parse(userId);
+            var userGuid = GetUserId();
             var result = await _workoutPlanRepository.DeleteWorkoutPlanAsync(userGuid, name);
 
             return result
