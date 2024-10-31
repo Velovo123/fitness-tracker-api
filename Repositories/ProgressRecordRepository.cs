@@ -29,19 +29,9 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 .Include(pr => pr.Exercise)
                 .AsQueryable();
 
-            if (queryParams.StartDate.HasValue)
-                progressRecordsQuery = progressRecordsQuery.Where(pr => pr.Date >= queryParams.StartDate.Value);
-
-            if (queryParams.EndDate.HasValue)
-                progressRecordsQuery = progressRecordsQuery.Where(pr => pr.Date <= queryParams.EndDate.Value);
-
-            if (!string.IsNullOrEmpty(queryParams.ExerciseName))
-            {
-                var normalizedExerciseName = NameNormalizationHelper.NormalizeName(queryParams.ExerciseName);
-                progressRecordsQuery = progressRecordsQuery.Where(pr => pr.Exercise.Name == normalizedExerciseName);
-            }
-
-            progressRecordsQuery = ApplySortingAndPaging(progressRecordsQuery, queryParams);
+            progressRecordsQuery = ApplyFilters(progressRecordsQuery, queryParams);
+            progressRecordsQuery = ApplySorting(progressRecordsQuery, queryParams);
+            progressRecordsQuery = ApplyPaging(progressRecordsQuery, queryParams);
 
             var progressRecords = await progressRecordsQuery.ToListAsync();
             return _mapper.Map<IEnumerable<ProgressRecordDto>>(progressRecords);
@@ -104,6 +94,34 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             _context.ProgressRecords.Remove(progressRecord);
             return await _context.SaveChangesAsync() > 0;
         }
+
+        private IQueryable<ProgressRecord> ApplyFilters(IQueryable<ProgressRecord> query, ProgressRecordQueryParams queryParams)
+        {
+            if (queryParams.StartDate.HasValue) query = query.Where(pr => pr.Date >= queryParams.StartDate.Value);
+            if (queryParams.EndDate.HasValue) query = query.Where(pr => pr.Date <= queryParams.EndDate.Value);
+            if (!string.IsNullOrEmpty(queryParams.ExerciseName))
+            {
+                var normalizedExerciseName = NameNormalizationHelper.NormalizeName(queryParams.ExerciseName);
+                query = query.Where(pr => pr.Exercise.Name == normalizedExerciseName);
+            }
+            return query;
+        }
+
+        private IQueryable<ProgressRecord> ApplySorting(IQueryable<ProgressRecord> query, ProgressRecordQueryParams queryParams)
+        {
+            return queryParams.SortBy?.ToLower() switch
+            {
+                "date" => queryParams.SortDescending == true ? query.OrderByDescending(pr => pr.Date) : query.OrderBy(pr => pr.Date),
+                _ => query.OrderBy(pr => pr.Date)
+            };
+        }
+
+        private IQueryable<ProgressRecord> ApplyPaging(IQueryable<ProgressRecord> query, ProgressRecordQueryParams queryParams)
+        {
+            return query.Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
+                        .Take(queryParams.PageSize ?? 10);
+        }
+
 
         private IQueryable<ProgressRecord> ApplySortingAndPaging(IQueryable<ProgressRecord> query, ProgressRecordQueryParams queryParams)
         {

@@ -1,15 +1,15 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
+using WorkoutFitnessTrackerAPI.Helpers;
 
 namespace WorkoutFitnessTrackerAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class ProgressRecordController : ControllerBase
+    public class ProgressRecordController : BaseApiController
     {
         private readonly IProgressRecordRepository _progressRecordRepository;
 
@@ -18,95 +18,59 @@ namespace WorkoutFitnessTrackerAPI.Controllers
             _progressRecordRepository = progressRecordRepository;
         }
 
-        // /api/ProgressRecord
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProgressRecordDto>>> GetProgressRecords([FromQuery] ProgressRecordQueryParams queryParams)
+        public async Task<ActionResult<ResponseWrapper<IEnumerable<ProgressRecordDto>>>> GetProgressRecords([FromQuery] ProgressRecordQueryParams queryParams)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (string.IsNullOrEmpty(userId))
+            if (!ModelState.IsValid)
             {
-                return Unauthorized("User ID is missing from the token.");
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+                return BadRequest(new ResponseWrapper<string>(false, null, string.Join("; ", errors)));
             }
-
-            var userGuid = Guid.Parse(userId);
-
+            var userGuid = GetUserId();
             var progressRecords = await _progressRecordRepository.GetProgressRecordsAsync(userGuid, queryParams);
 
-            if (progressRecords == null || !progressRecords.Any())
-            {
-                return NotFound("No progress records found for this user.");
-            }
-
-            return Ok(progressRecords);
+            return progressRecords == null || !progressRecords.Any()
+                ? NotFound(new ResponseWrapper<IEnumerable<ProgressRecordDto>>(false, null, "No progress records found for this user."))
+                : WrapResponse(true, progressRecords, "Progress records retrieved successfully.");
         }
 
-        // /api/ProgressRecord
         [HttpPost]
-        public async Task<ActionResult> SaveProgressRecord([FromBody] ProgressRecordDto progressRecordDto, [FromQuery] bool overwrite = false)
+        public async Task<ActionResult<ResponseWrapper<string>>> SaveProgressRecord([FromBody] ProgressRecordDto progressRecordDto, [FromQuery] bool overwrite = false)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized("User ID is missing from the token.");
-
-            var userGuid = Guid.Parse(userId);
-
-            try
+            if (!ModelState.IsValid)
             {
-                var result = await _progressRecordRepository.SaveProgressRecordAsync(userGuid, progressRecordDto, overwrite);
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+                return BadRequest(new ResponseWrapper<string>(false, null, string.Join(", ", errors)));
+            }
 
-                if (result)
-                    return Ok("Progress record saved successfully.");
-                else
-                    return BadRequest("Failed to save the progress record: No changes were detected, or an error occurred.");
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Conflict(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
+            var userGuid = GetUserId();
+            var result = await _progressRecordRepository.SaveProgressRecordAsync(userGuid, progressRecordDto, overwrite);
+
+            return result
+                ? WrapResponse(true, "Progress record saved successfully.", "Progress record saved successfully.")
+                : WrapResponse<string>(false, null, "Failed to save the progress record: No changes were detected, or an error occurred.");
         }
 
-        // /api/ProgressRecord/date/{date}/exercise/{exerciseName}
         [HttpGet("date/{date}/exercise/{exerciseName}")]
-        public async Task<ActionResult<ProgressRecordDto>> GetProgressRecordByDate(DateTime date, string exerciseName)
+        public async Task<ActionResult<ResponseWrapper<ProgressRecordDto>>> GetProgressRecordByDate(DateTime date, string exerciseName)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized("User ID is missing from the token.");
-
-            var userGuid = Guid.Parse(userId);
-
+            var userGuid = GetUserId();
             var progressRecord = await _progressRecordRepository.GetProgressRecordByDateAsync(userGuid, date, exerciseName);
 
-            if (progressRecord == null)
-                return NotFound($"No progress record found for {exerciseName} on {date}.");
-
-            return Ok(progressRecord);
+            return progressRecord == null
+                ? NotFound(new ResponseWrapper<ProgressRecordDto>(false, null, $"No progress record found for {exerciseName} on {date}."))
+                : WrapResponse(true, progressRecord, "Progress record retrieved successfully.");
         }
 
-        // /api/ProgressRecord/date/{date}/exercise/{exerciseName}
         [HttpDelete("date/{date}/exercise/{exerciseName}")]
-        public async Task<ActionResult> DeleteProgressRecord(DateTime date, string exerciseName)
+        public async Task<ActionResult<ResponseWrapper<string>>> DeleteProgressRecord(DateTime date, string exerciseName)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized("User ID is missing from the token.");
-
-            var userGuid = Guid.Parse(userId);
-
+            var userGuid = GetUserId();
             var result = await _progressRecordRepository.DeleteProgressRecordAsync(userGuid, date, exerciseName);
 
-            if (!result)
-                return NotFound($"No progress record found for {exerciseName} on {date} to delete.");
-
-            return Ok($"Progress record for {exerciseName} on {date} deleted successfully.");
+            return result
+                ? WrapResponse(true, $"Progress record for {exerciseName} on {date} deleted successfully.", "Progress record deleted successfully.")
+                : NotFound(new ResponseWrapper<string>(false, null, $"No progress record found for {exerciseName} on {date} to delete."));
         }
     }
 }
