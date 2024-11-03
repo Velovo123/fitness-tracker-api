@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 using WorkoutFitnessTrackerAPI.Data;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
+using WorkoutFitnessTrackerAPI.Models.Dto_s.IDto_s;
 using WorkoutFitnessTrackerAPI.Repositories;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Xunit;
@@ -200,7 +202,7 @@ namespace WorkoutFitnessTrackerAPI.Tests.Repositories
             // Arrange
             var workoutDto = new WorkoutDto { Date = DateTime.Today, Duration = 30, Exercises = new List<WorkoutExerciseDto>() };
             // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _repository.SaveWorkoutAsync(_testUserId, workoutDto, overwrite: false));
+            await Assert.ThrowsAsync<ArgumentException>(() => _repository.SaveWorkoutAsync(_testUserId, workoutDto, overwrite: false));
         }
 
         [Fact]
@@ -223,6 +225,90 @@ namespace WorkoutFitnessTrackerAPI.Tests.Repositories
             var result = await _repository.GetWorkoutsAsync(_testUserId, queryParams);
             // Assert
             Assert.All(result, workout => Assert.True(workout.Duration >= 50));
+        }
+
+        [Fact]
+        public async Task SaveWorkoutAsync_ThrowsValidationException_WhenWorkoutDtoIsNull()
+        {
+            // Act & Assert
+            await Assert.ThrowsAsync<ArgumentNullException>(() => _repository.SaveWorkoutAsync(_testUserId, null));
+        }
+
+        [Fact]
+        public void WorkoutDto_ValidationFails_WhenRequiredFieldsAreMissing()
+        {
+            // Arrange
+            var invalidWorkoutDto = new WorkoutDto
+            {
+                Date = default,
+                Duration = 0,
+                Exercises = new List<WorkoutExerciseDto>
+                {
+                    new WorkoutExerciseDto { ExerciseName = null, Sets = 0, Reps = 0 }
+                }
+            };
+
+            // Act - Validate main object
+            var validationResults = new List<ValidationResult>();
+            var context = new ValidationContext(invalidWorkoutDto, null, null);
+            Validator.TryValidateObject(invalidWorkoutDto, context, validationResults, validateAllProperties: true);
+
+            // Act - Validate nested objects manually
+            foreach (var exercise in invalidWorkoutDto.Exercises)
+            {
+                var exerciseContext = new ValidationContext(exercise, null, null);
+                Validator.TryValidateObject(exercise, exerciseContext, validationResults, validateAllProperties: true);
+            }
+
+            Assert.NotEmpty(validationResults);
+        }
+
+
+        [Fact]
+        public async Task SaveWorkoutAsync_CallsPrepareExercisesWithCorrectParameters()
+        {
+            // Arrange
+            var workoutDto = new WorkoutDto
+            {
+                Date = DateTime.Today.AddDays(1),
+                Duration = 30,
+                Exercises = new List<WorkoutExerciseDto>
+                {
+                    new WorkoutExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 10 },
+                    new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 15 }
+                }
+            };
+
+            _exerciseServiceMock.Setup(x => x.PrepareExercises<WorkoutExercise>(_testUserId, workoutDto.Exercises))
+                .ReturnsAsync(new List<WorkoutExercise>
+                {
+                    new WorkoutExercise { ExerciseId = Guid.NewGuid(), Sets = 3, Reps = 10 },
+                    new WorkoutExercise { ExerciseId = Guid.NewGuid(), Sets = 4, Reps = 15 }
+                });
+
+            // Act
+            await _repository.SaveWorkoutAsync(_testUserId, workoutDto);
+
+            // Assert
+            _exerciseServiceMock.Verify(x => x.PrepareExercises<WorkoutExercise>(_testUserId, workoutDto.Exercises), Times.Once);
+        }
+
+        [Fact]
+        public async Task SaveWorkoutAsync_DoesNotCallPrepareExercises_WhenExercisesListIsEmpty()
+        {
+            // Arrange
+            var workoutDto = new WorkoutDto
+            {
+                Date = DateTime.Today.AddDays(1),
+                Duration = 30,
+                Exercises = new List<WorkoutExerciseDto>() // Empty list
+            };
+
+            // Act
+            await Assert.ThrowsAsync<ArgumentException>(async () => await _repository.SaveWorkoutAsync(_testUserId, workoutDto));
+
+            // Assert - Verify PrepareExercises was not called
+            _exerciseServiceMock.Verify(x => x.PrepareExercises<WorkoutExercise>(_testUserId, It.IsAny<IEnumerable<IExerciseDto>>()), Times.Never);
         }
     }
 }
