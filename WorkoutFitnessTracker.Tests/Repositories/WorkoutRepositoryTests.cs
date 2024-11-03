@@ -193,5 +193,36 @@ namespace WorkoutFitnessTrackerAPI.Tests.Repositories
             Assert.True(deleteResult);
             Assert.False(workoutExists);
         }
+
+        [Fact]
+        public async Task SaveWorkoutAsync_ThrowsWhenOverwriteIsFalseAndWorkoutExists()
+        {
+            // Arrange
+            var workoutDto = new WorkoutDto { Date = DateTime.Today, Duration = 30, Exercises = new List<WorkoutExerciseDto>() };
+            // Act & Assert
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _repository.SaveWorkoutAsync(_testUserId, workoutDto, overwrite: false));
+        }
+
+        [Fact]
+        public async Task DeleteWorkoutAsync_ReturnsFalseWhenWorkoutNotFound()
+        {
+            // Arrange
+            var nonExistentDate = DateTime.Today.AddDays(5);
+            // Act
+            var result = await _repository.DeleteWorkoutAsync(_testUserId, nonExistentDate);
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task GetWorkoutsAsync_FiltersWorkoutsByDuration()
+        {
+            // Arrange
+            var queryParams = new WorkoutQueryParams { MinDuration = 50 };
+            // Act
+            var result = await _repository.GetWorkoutsAsync(_testUserId, queryParams);
+            // Assert
+            Assert.All(result, workout => Assert.True(workout.Duration >= 50));
+        }
     }
 }
