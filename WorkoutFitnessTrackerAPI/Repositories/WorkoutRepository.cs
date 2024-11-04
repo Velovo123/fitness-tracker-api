@@ -45,6 +45,9 @@
 
             public async Task<bool> SaveWorkoutAsync(Guid userId, WorkoutDto workoutDto, bool overwrite = false)
             {
+                if (workoutDto == null) throw new ArgumentNullException(nameof(workoutDto));
+                if (workoutDto.Exercises == null || !workoutDto.Exercises.Any()) throw new ArgumentException("At least one exercise is required.", nameof(workoutDto.Exercises));
+
                 var standardizedDate = workoutDto.Date;
                 var existingWorkout = await FindWorkoutAsync(userId, standardizedDate);
 
