@@ -47,6 +47,9 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
         public async Task<bool> SaveWorkoutPlanAsync(Guid userId, WorkoutPlanDto workoutPlanDto, bool overwrite = false)
         {
+            if (workoutPlanDto == null) throw new ArgumentNullException(nameof(workoutPlanDto));
+            if (string.IsNullOrWhiteSpace(workoutPlanDto.Name)) throw new ArgumentException("Workout plan name cannot be null or empty.", nameof(workoutPlanDto.Name));
+            if (workoutPlanDto.Exercises == null || !workoutPlanDto.Exercises.Any()) throw new ArgumentException("At least one exercise is required.", nameof(workoutPlanDto.Exercises));
             var normalizedPlanName = NameNormalizationHelper.NormalizeName(workoutPlanDto.Name);
             var existingPlan = await FindWorkoutPlanByName(userId, normalizedPlanName);
 
