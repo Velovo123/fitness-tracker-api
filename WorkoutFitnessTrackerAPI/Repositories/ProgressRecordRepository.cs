@@ -49,6 +49,15 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
         public async Task<bool> SaveProgressRecordAsync(Guid userId, ProgressRecordDto progressRecordDto, bool overwrite = false)
         {
+            if (progressRecordDto == null)
+                throw new ArgumentNullException(nameof(progressRecordDto));
+
+            if (string.IsNullOrWhiteSpace(progressRecordDto.ExerciseName))
+                throw new ArgumentException("Exercise name cannot be null or empty.", nameof(progressRecordDto.ExerciseName));
+
+            if (string.IsNullOrWhiteSpace(progressRecordDto.Progress))
+                throw new ArgumentException("Progress cannot be null or empty.", nameof(progressRecordDto.Progress));
+
             var exercise = await _exerciseService.GetExerciseByNormalizedNameAsync(progressRecordDto.ExerciseName);
             if (exercise == null)
             {
