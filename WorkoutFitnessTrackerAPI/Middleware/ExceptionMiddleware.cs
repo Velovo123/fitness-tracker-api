@@ -33,6 +33,7 @@ namespace WorkoutFitnessTrackerAPI.Middleware
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = exception switch
             {
+                UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
                 KeyNotFoundException => (int)HttpStatusCode.NotFound,
                 ArgumentException => (int)HttpStatusCode.BadRequest,
                 InvalidOperationException => (int)HttpStatusCode.Conflict,
