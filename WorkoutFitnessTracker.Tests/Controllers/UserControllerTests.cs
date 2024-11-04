@@ -125,7 +125,7 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
             var userId = "d2719a63-3c3f-4a53-b2ad-7631c0f8a5e8";
             var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
             {
-        new Claim(ClaimTypes.NameIdentifier, userId)
+                new Claim(ClaimTypes.NameIdentifier, userId)
             }));
             _userController.ControllerContext.HttpContext = new DefaultHttpContext { User = claimsPrincipal };
 
@@ -231,7 +231,5 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
             Assert.True(response.Success);
             Assert.Equal(userProfile, response.Data);
         }
-
-
     }
 }
