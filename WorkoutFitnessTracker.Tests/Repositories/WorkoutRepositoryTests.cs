@@ -7,6 +7,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 using WorkoutFitnessTrackerAPI.Data;
+using WorkoutFitnessTrackerAPI.Mappings;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Models.Dto_s.IDto_s;
@@ -21,7 +22,7 @@ namespace WorkoutFitnessTrackerAPI.Tests.Repositories
         private readonly WFTDbContext _context;
         private readonly WorkoutRepository _repository;
         private readonly Mock<IExerciseService> _exerciseServiceMock;
-        private readonly Mock<IMapper> _mapperMock;
+        private readonly IMapper _mapper;
         private readonly Guid _testUserId = Guid.NewGuid();
 
         public WorkoutRepositoryTests()
@@ -33,25 +34,13 @@ namespace WorkoutFitnessTrackerAPI.Tests.Repositories
             _context = new WFTDbContext(options);
 
             _exerciseServiceMock = new Mock<IExerciseService>();
-            _mapperMock = new Mock<IMapper>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.AddProfile<WorkoutMappingProfile>(); // Ensure WorkoutMappingProfile is defined in your API project
+            });
+            _mapper = config.CreateMapper();
 
-            // Setup AutoMapper for DTOs in tests
-            _mapperMock.Setup(m => m.Map<IEnumerable<WorkoutDto>>(It.IsAny<IEnumerable<Workout>>()))
-                .Returns((IEnumerable<Workout> workouts) =>
-                    workouts.Select(w => new WorkoutDto
-                    {
-                        Date = w.Date,
-                        Duration = w.Duration,
-                        Exercises = w.WorkoutExercises.Select(e => new WorkoutExerciseDto
-                        {
-                            ExerciseName = e.Exercise.Name,
-                            Sets = e.Sets,
-                            Reps = e.Reps
-                        }).ToList()
-                    })
-                );
-
-            _repository = new WorkoutRepository(_context, _exerciseServiceMock.Object, _mapperMock.Object);
+            _repository = new WorkoutRepository(_context, _exerciseServiceMock.Object, _mapper);
 
             SeedDatabase();
         }
