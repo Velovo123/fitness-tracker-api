@@ -1,12 +1,15 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using System.Collections.Generic;
 using System.Security.Claims;
+using System.Threading.Tasks;
 using WorkoutFitnessTrackerAPI.Controllers;
 using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Models.Dto_s.User;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
+using Xunit;
 
 namespace WorkoutFitnessTrackerAPI.Tests.Controllers
 {
@@ -31,12 +34,14 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
                 .ReturnsAsync(authResult);
 
             // Act
-            var result = await _userController.RegisterUser(registrationDto) as OkObjectResult;
+            var result = await _userController.RegisterUser(registrationDto);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-            var response = result.Value as ResponseWrapper<object>;
+            var okResult = result.Result as OkObjectResult; 
+            Assert.NotNull(okResult);
+            Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+
+            var response = okResult.Value as ResponseWrapper<string>;
             Assert.NotNull(response);
             Assert.True(response.Success);
             Assert.Equal("User registered successfully!", response.Message);
@@ -52,15 +57,17 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
                 .ReturnsAsync(authResult);
 
             // Act
-            var result = await _userController.RegisterUser(registrationDto) as BadRequestObjectResult;
+            var result = await _userController.RegisterUser(registrationDto);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
-            var response = result.Value as ResponseWrapper<object>;
+            var badRequestResult = result.Result as BadRequestObjectResult;
+            Assert.NotNull(badRequestResult);
+            Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+
+            var response = badRequestResult.Value as ResponseWrapper<string>;
             Assert.NotNull(response);
             Assert.False(response.Success);
-            Assert.Equal("Error", ((List<string>)response.Data)[0]);
+            Assert.Equal("Registration failed", response.Message);
         }
 
         [Fact]
@@ -73,12 +80,14 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
                 .ReturnsAsync(authResult);
 
             // Act
-            var result = await _userController.LoginUser(loginDto) as OkObjectResult;
+            var result = await _userController.LoginUser(loginDto);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-            var response = result.Value as ResponseWrapper<string>;
+            var okResult = result.Result as OkObjectResult;
+            Assert.NotNull(okResult);
+            Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+
+            var response = okResult.Value as ResponseWrapper<string>;
             Assert.NotNull(response);
             Assert.True(response.Success);
             Assert.Equal("sample-token", response.Data);
@@ -94,25 +103,29 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
                 .ReturnsAsync(authResult);
 
             // Act
-            var result = await _userController.LoginUser(loginDto) as UnauthorizedObjectResult;
+            var result = await _userController.LoginUser(loginDto);
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(StatusCodes.Status401Unauthorized, result.StatusCode);
-            var response = result.Value as ResponseWrapper<object>;
+            var unauthorizedResult = result.Result as UnauthorizedObjectResult; 
+            Assert.NotNull(unauthorizedResult);
+            Assert.Equal(StatusCodes.Status401Unauthorized, unauthorizedResult.StatusCode);
+
+            var response = unauthorizedResult.Value as ResponseWrapper<string>;
             Assert.NotNull(response);
             Assert.False(response.Success);
-            Assert.Equal("Invalid credentials", ((List<string>)response.Data)[0]);
+            Assert.Equal("Invalid credentials", response.Message);
         }
+
 
         [Fact]
         public async Task GetUserProfile_ShouldReturnOk_WhenUserProfileIsFound()
         {
             // Arrange
-            var userId = "sample-user-id";
+            var userId = "d2719a63-3c3f-4a53-b2ad-7631c0f8a5e8";
             var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
             {
-                new Claim(ClaimTypes.NameIdentifier, userId)
+        new Claim(ClaimTypes.NameIdentifier, userId)
             }));
             _userController.ControllerContext.HttpContext = new DefaultHttpContext { User = claimsPrincipal };
 
@@ -121,12 +134,14 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
                 .ReturnsAsync(userProfile);
 
             // Act
-            var result = await _userController.GetUserProfile() as OkObjectResult;
+            var result = await _userController.GetUserProfile();
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-            var response = result.Value as ResponseWrapper<UserProfileDto>;
+            var okResult = result.Result as OkObjectResult;
+            Assert.NotNull(okResult);
+            Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+
+            var response = okResult.Value as ResponseWrapper<UserProfileDto>;
             Assert.NotNull(response);
             Assert.True(response.Success);
             Assert.Equal(userProfile, response.Data);
@@ -141,15 +156,82 @@ namespace WorkoutFitnessTrackerAPI.Tests.Controllers
                 .ReturnsAsync((UserProfileDto?)null);
 
             // Act
-            var result = await _userController.GetUserByEmail(email) as NotFoundObjectResult;
+            var result = await _userController.GetUserByEmail(email);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Equal(StatusCodes.Status404NotFound, result.StatusCode);
-            var response = result.Value as ResponseWrapper<object>;
+            Assert.IsType<NotFoundObjectResult>(result.Result); 
+            var notFoundResult = result.Result as NotFoundObjectResult;
+            Assert.NotNull(notFoundResult);
+
+            var response = notFoundResult.Value as ResponseWrapper<UserProfileDto>;
             Assert.NotNull(response);
             Assert.False(response.Success);
             Assert.Equal("User not found", response.Message);
         }
+
+        [Fact]
+        public async Task RegisterUser_ShouldReturnBadRequest_WhenModelStateIsInvalid()
+        {
+            // Arrange
+            _userController.ModelState.AddModelError("Email", "Required");
+
+            // Act
+            var result = await _userController.RegisterUser(new UserRegistrationDto("", "", ""));
+
+            // Assert
+            var badRequestResult = result.Result as BadRequestObjectResult;
+            Assert.NotNull(badRequestResult);
+            Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+
+            var response = badRequestResult.Value as ResponseWrapper<string>;
+            Assert.NotNull(response);
+            Assert.False(response.Success);
+            Assert.Contains("Required", response.Message);
+        }
+
+        [Fact]
+        public async Task GetUserProfile_ShouldReturnUnauthorized_WhenUserIdIsMissing()
+        {
+            // Arrange
+            _userController.ControllerContext.HttpContext = new DefaultHttpContext(); // No user claims set
+
+            // Act
+            var result = await _userController.GetUserProfile();
+
+            // Assert
+            var unauthorizedResult = result.Result as UnauthorizedObjectResult;
+            Assert.NotNull(unauthorizedResult);
+            Assert.Equal(StatusCodes.Status401Unauthorized, unauthorizedResult.StatusCode);
+
+            var response = unauthorizedResult.Value as ResponseWrapper<UserProfileDto>;
+            Assert.NotNull(response);
+            Assert.False(response.Success);
+            Assert.Equal("User ID is missing from the token.", response.Message);
+        }
+
+        [Fact]
+        public async Task GetUserByEmail_ShouldReturnOk_WhenUserIsFound()
+        {
+            // Arrange
+            var email = "test@example.com";
+            var userProfile = new UserProfileDto { Name = "Test User", Email = email };
+            _userRepositoryMock.Setup(repo => repo.GetUserByEmailAsync(email))
+                .ReturnsAsync(userProfile);
+
+            // Act
+            var result = await _userController.GetUserByEmail(email);
+
+            // Assert
+            var okResult = result.Result as OkObjectResult;
+            Assert.NotNull(okResult);
+            Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+
+            var response = okResult.Value as ResponseWrapper<UserProfileDto>;
+            Assert.NotNull(response);
+            Assert.True(response.Success);
+            Assert.Equal(userProfile, response.Data);
+        }
+
+
     }
 }
