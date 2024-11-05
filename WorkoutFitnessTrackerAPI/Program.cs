@@ -12,6 +12,8 @@ using Microsoft.OpenApi.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Middleware;
+using WorkoutFitnessTracker.API.Services.IServices;
+using WorkoutFitnessTracker.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +91,7 @@ builder.Services.AddIdentityCore<User>(options =>
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IExerciseService, ExerciseService>();
+builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
 builder.Services.AddScoped<IWorkoutPlanRepository, WorkoutPlanRepository>();
