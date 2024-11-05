@@ -6,6 +6,10 @@ using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
 using WorkoutFitnessTrackerAPI.Helpers;
+using System.Collections.Generic;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
@@ -47,50 +51,39 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             return progressRecord == null ? null : _mapper.Map<ProgressRecordDto>(progressRecord);
         }
 
-        public async Task<bool> SaveProgressRecordAsync(Guid userId, ProgressRecordDto progressRecordDto, bool overwrite = false)
+        public async Task<bool> CreateProgressRecordAsync(Guid userId, ProgressRecordDto progressRecordDto)
         {
-            if (progressRecordDto == null)
-                throw new ArgumentNullException(nameof(progressRecordDto));
+            var exercise = await _exerciseService.GetExerciseByNormalizedNameAsync(progressRecordDto.ExerciseName)
+                          ?? throw new InvalidOperationException("The specified exercise does not exist.");
 
-            if (string.IsNullOrWhiteSpace(progressRecordDto.ExerciseName))
-                throw new ArgumentException("Exercise name cannot be null or empty.", nameof(progressRecordDto.ExerciseName));
+            await EnsureUserExerciseLinkAsync(userId, exercise.Id);
 
-            if (string.IsNullOrWhiteSpace(progressRecordDto.Progress))
-                throw new ArgumentException("Progress cannot be null or empty.", nameof(progressRecordDto.Progress));
-
-            var exercise = await _exerciseService.GetExerciseByNormalizedNameAsync(progressRecordDto.ExerciseName);
-            if (exercise == null)
+            var progressRecord = new ProgressRecord
             {
-                throw new InvalidOperationException("The specified exercise does not exist.");
-            }
+                UserId = userId,
+                ExerciseId = exercise.Id,
+                Date = progressRecordDto.Date,
+                Progress = progressRecordDto.Progress
+            };
 
-            var isUserLinkedToExercise = await _context.UserExercises
-                .AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == exercise.Id);
+            _context.ProgressRecords.Add(progressRecord);
+            return await _context.SaveChangesAsync() > 0;
+        }
 
-            if (!isUserLinkedToExercise)
-            {
-                throw new InvalidOperationException("User is not linked to the specified exercise.");
-            }
+        public async Task<bool> UpdateProgressRecordAsync(Guid userId, ProgressRecordDto progressRecordDto)
+        {
+            var exercise = await _exerciseService.GetExerciseByNormalizedNameAsync(progressRecordDto.ExerciseName)
+                          ?? throw new InvalidOperationException("The specified exercise does not exist.");
 
             var existingRecord = await _context.ProgressRecords
                 .FirstOrDefaultAsync(pr => pr.UserId == userId && pr.Date.Date == progressRecordDto.Date.Date && pr.ExerciseId == exercise.Id);
 
-            if (existingRecord != null)
-            {
-                if (!overwrite)
-                {
-                    throw new InvalidOperationException("A progress record for this exercise on the given date already exists. Confirm overwrite.");
-                }
-                UpdateExistingProgressRecord(existingRecord, progressRecordDto.Progress);
-            }
-            else
-            {
-                CreateNewProgressRecord(userId, exercise.Id, progressRecordDto.Date, progressRecordDto.Progress);
-            }
+            if (existingRecord == null)
+                throw new KeyNotFoundException("Progress record not found for the specified date and exercise.");
 
+            existingRecord.Progress = progressRecordDto.Progress;
             return await _context.SaveChangesAsync() > 0;
         }
-
 
         public async Task<bool> DeleteProgressRecordAsync(Guid userId, DateTime date, string exerciseName)
         {
@@ -102,6 +95,18 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
             _context.ProgressRecords.Remove(progressRecord);
             return await _context.SaveChangesAsync() > 0;
+        }
+
+        private async Task EnsureUserExerciseLinkAsync(Guid userId, Guid exerciseId)
+        {
+            var userExerciseLinkExists = await _context.UserExercises
+                .AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == exerciseId);
+
+            if (!userExerciseLinkExists)
+            {
+                _context.UserExercises.Add(new UserExercise { UserId = userId, ExerciseId = exerciseId });
+                await _context.SaveChangesAsync();
+            }
         }
 
         private IQueryable<ProgressRecord> ApplyFilters(IQueryable<ProgressRecord> query, ProgressRecordQueryParams queryParams)
@@ -129,37 +134,6 @@ namespace WorkoutFitnessTrackerAPI.Repositories
         {
             return query.Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
                         .Take(queryParams.PageSize ?? 10);
-        }
-
-
-        private IQueryable<ProgressRecord> ApplySortingAndPaging(IQueryable<ProgressRecord> query, ProgressRecordQueryParams queryParams)
-        {
-            query = queryParams.SortBy?.ToLower() switch
-            {
-                "date" => queryParams.SortDescending == true ? query.OrderByDescending(pr => pr.Date) : query.OrderBy(pr => pr.Date),
-                _ => query.OrderBy(pr => pr.Date)
-            };
-
-            return query
-                .Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
-                .Take(queryParams.PageSize ?? 10);
-        }
-
-        private void UpdateExistingProgressRecord(ProgressRecord existingRecord, string newProgress)
-        {
-            existingRecord.Progress = newProgress;
-        }
-
-        private void CreateNewProgressRecord(Guid userId, Guid exerciseId, DateTime date, string progress)
-        {
-            var progressRecord = new ProgressRecord
-            {
-                UserId = userId,
-                ExerciseId = exerciseId,
-                Date = date,
-                Progress = progress
-            };
-            _context.ProgressRecords.Add(progressRecord);
         }
     }
 }

@@ -1,223 +1,187 @@
-﻿using AutoMapper;
+﻿using Xunit;
 using Microsoft.EntityFrameworkCore;
-using Moq;
+using AutoMapper;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using WorkoutFitnessTrackerAPI.Data;
-using WorkoutFitnessTrackerAPI.Helpers;
-using WorkoutFitnessTrackerAPI.Mappings;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories;
 using WorkoutFitnessTrackerAPI.Services.IServices;
-using Xunit;
+using WorkoutFitnessTrackerAPI.Mappings;
+using Moq;
 
 namespace WorkoutFitnessTrackerAPI.Tests.Repositories
 {
-    public class ProgressRecordRepositoryTests : IDisposable
+    public class ProgressRecordRepositoryTests
     {
         private readonly WFTDbContext _context;
-        private readonly ProgressRecordRepository _repository;
-        private readonly Mock<IExerciseService> _exerciseServiceMock;
+        private readonly ProgressRecordRepository _progressRecordRepository;
         private readonly IMapper _mapper;
-        private readonly Guid _testUserId = Guid.NewGuid();
+        private readonly Mock<IExerciseService> _exerciseServiceMock;
 
         public ProgressRecordRepositoryTests()
         {
             var options = new DbContextOptionsBuilder<WFTDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase")
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
-
             _context = new WFTDbContext(options);
-            _exerciseServiceMock = new Mock<IExerciseService>();
 
-            var config = new MapperConfiguration(cfg =>
-            {
-                cfg.AddProfile<ProgressRecordMappingProfile>(); 
-            });
+            var config = new MapperConfiguration(cfg => cfg.AddProfile<ProgressRecordMappingProfile>());
             _mapper = config.CreateMapper();
 
-            _repository = new ProgressRecordRepository(_context, _exerciseServiceMock.Object, _mapper);
-
-            SeedDatabase();
+            _exerciseServiceMock = new Mock<IExerciseService>();
+            _progressRecordRepository = new ProgressRecordRepository(_context, _exerciseServiceMock.Object, _mapper);
         }
 
-        private void SeedDatabase()
+        [Fact]
+        public async Task GetProgressRecordByDateAsync_ShouldReturnRecordByDateAndExercise()
         {
-            var exercise = new Exercise { Name = "pushup" };
-            var progressRecord = new ProgressRecord
+            // Arrange
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.Date;
+            var normalizedExerciseName = "pushup";
+            var exercise = new Exercise { Name = normalizedExerciseName };
+            _context.Exercises.Add(exercise);
+
+            _context.ProgressRecords.Add(new ProgressRecord
             {
-                UserId = _testUserId,
+                UserId = userId,
                 Exercise = exercise,
-                Date = DateTime.Today,
-                Progress = "15 reps"
-            };
-
-            _context.Exercises.Add(exercise);
-            _context.ProgressRecords.Add(progressRecord);
-            _context.SaveChanges();
-        }
-
-        public void Dispose()
-        {
-            _context.Dispose();
-        }
-
-        [Fact]
-        public async Task GetProgressRecordsAsync_ReturnsRecordsWithCorrectData()
-        {
-            // Arrange
-            var queryParams = new ProgressRecordQueryParams();
-
-            // Act
-            var result = await _repository.GetProgressRecordsAsync(_testUserId, queryParams);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.All(result, record =>
-            {
-                Assert.NotNull(record.ExerciseName);
-                Assert.NotEqual(DateTime.MinValue, record.Date);
-                Assert.False(string.IsNullOrEmpty(record.Progress));
+                Date = date,
+                Progress = "Improved form"
             });
-        }
-
-        [Fact]
-        public async Task GetProgressRecordByDateAsync_ReturnsCorrectRecord()
-        {
-            // Act
-            var result = await _repository.GetProgressRecordByDateAsync(_testUserId, DateTime.Today, "Push Up");
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("pushup", result!.ExerciseName);
-        }
-
-        [Fact]
-        public async Task SaveProgressRecordAsync_CreatesOrUpdatesRecordCorrectly()
-        {
-            // Arrange
-            var exerciseName = "Push Up";
-            var exercise = new Exercise { Id = Guid.NewGuid(), Name = "pushup" };
-
-            _context.Exercises.Add(exercise);
-
-            _context.UserExercises.Add(new UserExercise
-            {
-                UserId = _testUserId,
-                ExerciseId = exercise.Id
-            });
-
             await _context.SaveChangesAsync();
 
-            var progressRecordDto = new ProgressRecordDto
-            {
-                ExerciseName = exerciseName,
-                Date = DateTime.Today,
-                Progress = "20 reps"
-            };
+            // Act
+            var result = await _progressRecordRepository.GetProgressRecordByDateAsync(userId, date, "Push Up");
 
-            _exerciseServiceMock.Setup(x => x.GetExerciseByNormalizedNameAsync(exerciseName))
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal("Improved form", result.Progress);
+        }
+
+        [Fact]
+        public async Task CreateProgressRecordAsync_ShouldAddRecordToDatabase()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var normalizedExerciseName = "pushup";
+
+            // Add the exercise with the normalized name directly to the database
+            var exercise = new Exercise { Name = normalizedExerciseName };
+            _context.Exercises.Add(exercise);
+            await _context.SaveChangesAsync();
+
+            // Mock the exercise service to return the exercise based on the normalized name
+            _exerciseServiceMock
+                .Setup(service => service.GetExerciseByNormalizedNameAsync(normalizedExerciseName))
                 .ReturnsAsync(exercise);
 
-            // Act - Test creating a new record
-            var createResult = await _repository.SaveProgressRecordAsync(_testUserId, progressRecordDto, overwrite: false);
-
-            // Assert
-            Assert.True(createResult);
-        }
-
-
-        [Fact]
-        public async Task DeleteProgressRecordAsync_RemovesRecordIfExists()
-        {
-            // Arrange
-            var date = DateTime.Today;
-            var exerciseName = "Push Up";
+            // Create the DTO with the normalized name, simulating the input as normalized
+            var progressRecordDto = new ProgressRecordDto
+            {
+                Date = DateTime.Now,
+                ExerciseName = "pushup", // Ensure name is already normalized
+                Progress = "New milestone"
+            };
 
             // Act
-            var deleteResult = await _repository.DeleteProgressRecordAsync(_testUserId, date, exerciseName);
-            var recordExists = await _context.ProgressRecords
-                .AnyAsync(pr => pr.UserId == _testUserId && pr.Date.Date == date && pr.Exercise.Name == exerciseName);
+            var result = await _progressRecordRepository.CreateProgressRecordAsync(userId, progressRecordDto);
+            var createdRecord = await _context.ProgressRecords.FirstOrDefaultAsync(pr => pr.UserId == userId);
 
             // Assert
-            Assert.True(deleteResult);
-            Assert.False(recordExists);
+            Assert.True(result);
+            Assert.NotNull(createdRecord);
+            Assert.Equal("New milestone", createdRecord.Progress);
+            Assert.Equal(normalizedExerciseName, createdRecord.Exercise.Name);
         }
 
+
         [Fact]
-        public async Task SaveProgressRecordAsync_ThrowsWhenExerciseNotLinkedToUser()
+        public async Task UpdateProgressRecordAsync_ShouldUpdateExistingRecord()
         {
             // Arrange
-            var progressRecordDto = new ProgressRecordDto
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.Date;
+            var normalizedExerciseName = "pushup";
+            var exercise = new Exercise { Id = Guid.NewGuid(), Name = normalizedExerciseName };
+            _context.Exercises.Add(exercise);
+
+            var progressRecord = new ProgressRecord
             {
-                ExerciseName = "Nonexistent Exercise",
-                Date = DateTime.Today,
-                Progress = "20 reps"
+                UserId = userId,
+                ExerciseId = exercise.Id,
+                Date = date,
+                Progress = "Initial progress"
+            };
+            _context.ProgressRecords.Add(progressRecord);
+            await _context.SaveChangesAsync();
+
+            var updatedDto = new ProgressRecordDto
+            {
+                Date = date,
+                ExerciseName = "pushup",
+                Progress = "Updated progress"
             };
 
-            _exerciseServiceMock.Setup(x => x.GetExerciseByNormalizedNameAsync("nonexistent-exercise"))
-                .ReturnsAsync((Exercise)null);
+            _exerciseServiceMock
+                .Setup(service => service.GetExerciseByNormalizedNameAsync(normalizedExerciseName))
+                .ReturnsAsync(exercise);
 
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _repository.SaveProgressRecordAsync(_testUserId, progressRecordDto, overwrite: false));
+            // Act
+            var result = await _progressRecordRepository.UpdateProgressRecordAsync(userId, updatedDto);
+            var updatedRecord = await _context.ProgressRecords.FirstOrDefaultAsync(pr => pr.UserId == userId && pr.Date == date);
+
+            // Assert
+            Assert.True(result);
+            Assert.NotNull(updatedRecord);
+            Assert.Equal("Updated progress", updatedRecord.Progress);
         }
 
         [Fact]
-        public async Task SaveProgressRecordAsync_ThrowsWhenRecordAlreadyExistsAndNoOverwrite()
+        public async Task DeleteProgressRecordAsync_ShouldRemoveRecordFromDatabase()
         {
             // Arrange
-            var progressRecordDto = new ProgressRecordDto
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.Date;
+            var normalizedExerciseName = "pushup";
+            var exercise = new Exercise { Name = normalizedExerciseName };
+            _context.Exercises.Add(exercise);
+
+            var progressRecord = new ProgressRecord
             {
-                ExerciseName = "Push Up",
-                Date = DateTime.Today,
-                Progress = "20 reps"
+                UserId = userId,
+                Exercise = exercise,
+                Date = date,
+                Progress = "To be deleted"
             };
+            _context.ProgressRecords.Add(progressRecord);
+            await _context.SaveChangesAsync();
 
-            _exerciseServiceMock.Setup(x => x.GetExerciseByNormalizedNameAsync("push-up"))
-                .ReturnsAsync(new Exercise { Name = "Push Up" });
+            // Act
+            var result = await _progressRecordRepository.DeleteProgressRecordAsync(userId, date, "Push Up");
+            var deletedRecord = await _context.ProgressRecords.FirstOrDefaultAsync(pr => pr.UserId == userId && pr.Date == date);
 
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _repository.SaveProgressRecordAsync(_testUserId, progressRecordDto, overwrite: false));
+            // Assert
+            Assert.True(result);
+            Assert.Null(deletedRecord);
         }
 
         [Fact]
-        public async Task SaveProgressRecordAsync_ThrowsArgumentNullException_WhenProgressRecordDtoIsNull()
-        {
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _repository.SaveProgressRecordAsync(_testUserId, null));
-        }
-
-        [Fact]
-        public async Task SaveProgressRecordAsync_ThrowsArgumentException_WhenProgressRecordDtoExerciseNameIsEmpty()
-        {
-            // Arrange
-            var progressRecordDto = new ProgressRecordDto
-            {
-                ExerciseName = string.Empty, // Invalid name
-                Date = DateTime.Today,
-                Progress = "20 reps"
-            };
-
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentException>(() => _repository.SaveProgressRecordAsync(_testUserId, progressRecordDto));
-        }
-
-        [Fact]
-        public async Task SaveProgressRecordAsync_ThrowsArgumentException_WhenProgressRecordDtoProgressIsEmpty()
+        public async Task DeleteProgressRecordAsync_NonExistentRecord_ShouldReturnFalse()
         {
             // Arrange
-            var progressRecordDto = new ProgressRecordDto
-            {
-                ExerciseName = "Push Up",
-                Date = DateTime.Today,
-                Progress = string.Empty // Empty progress field
-            };
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.Date;
 
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentException>(() => _repository.SaveProgressRecordAsync(_testUserId, progressRecordDto));
+            // Act
+            var result = await _progressRecordRepository.DeleteProgressRecordAsync(userId, date, "NonExistent Exercise");
+
+            // Assert
+            Assert.False(result);
         }
     }
 }
