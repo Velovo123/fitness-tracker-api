@@ -6,7 +6,8 @@ namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
     {
         Task<IEnumerable<ProgressRecordDto>> GetProgressRecordsAsync(Guid userId, ProgressRecordQueryParams queryParams);
         Task<ProgressRecordDto?> GetProgressRecordByDateAsync(Guid userId, DateTime date, string exerciseName);
-        Task<bool> SaveProgressRecordAsync(Guid userId, ProgressRecordDto progressRecordDto, bool overwrite = false);
+        Task<bool> CreateProgressRecordAsync(Guid userId, ProgressRecordDto progressRecordDto);
+        Task<bool> UpdateProgressRecordAsync(Guid userId, ProgressRecordDto progressRecordDto);
         Task<bool> DeleteProgressRecordAsync(Guid userId, DateTime date, string exerciseName);
     }
 }
