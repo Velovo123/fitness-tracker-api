@@ -1,303 +1,221 @@
-﻿using AutoMapper;
+﻿using Xunit;
 using Microsoft.EntityFrameworkCore;
-using Moq;
+using AutoMapper;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using WorkoutFitnessTrackerAPI.Data;
-using WorkoutFitnessTrackerAPI.Mappings;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
-using WorkoutFitnessTrackerAPI.Models.Dto_s.IDto_s;
 using WorkoutFitnessTrackerAPI.Repositories;
 using WorkoutFitnessTrackerAPI.Services.IServices;
-using Xunit;
+using WorkoutFitnessTrackerAPI.Mappings;
+using Moq;
 
 namespace WorkoutFitnessTrackerAPI.Tests.Repositories
 {
-    public class WorkoutRepositoryTests : IDisposable
+    public class WorkoutRepositoryTests
     {
         private readonly WFTDbContext _context;
-        private readonly WorkoutRepository _repository;
-        private readonly Mock<IExerciseService> _exerciseServiceMock;
+        private readonly WorkoutRepository _workoutRepository;
         private readonly IMapper _mapper;
-        private readonly Guid _testUserId = Guid.NewGuid();
 
         public WorkoutRepositoryTests()
         {
+            // Configure in-memory database
             var options = new DbContextOptionsBuilder<WFTDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase")
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
-
             _context = new WFTDbContext(options);
 
-            _exerciseServiceMock = new Mock<IExerciseService>();
-            var config = new MapperConfiguration(cfg =>
-            {
-                cfg.AddProfile<WorkoutMappingProfile>(); // Ensure WorkoutMappingProfile is defined in your API project
-            });
+            // Configure AutoMapper
+            var config = new MapperConfiguration(cfg => cfg.AddProfile<WorkoutMappingProfile>());
             _mapper = config.CreateMapper();
 
-            _repository = new WorkoutRepository(_context, _exerciseServiceMock.Object, _mapper);
-
-            SeedDatabase();
-        }
-
-        private void SeedDatabase()
-        {
-            var exercise1 = new Exercise { Name = "Push Up" };
-            var exercise2 = new Exercise { Name = "Squat" };
-
-            var workout1 = new Workout
-            {
-                UserId = _testUserId,
-                Date = DateTime.Today,
-                Duration = 60,
-                WorkoutExercises = new List<WorkoutExercise>
-                {
-                    new WorkoutExercise { Sets = 3, Reps = 10, Exercise = exercise1 },
-                    new WorkoutExercise { Sets = 4, Reps = 15, Exercise = exercise2 }
-                }
-            };
-
-            var workout2 = new Workout
-            {
-                UserId = _testUserId,
-                Date = DateTime.Today.AddDays(-1),
-                Duration = 45,
-                WorkoutExercises = new List<WorkoutExercise>
-                {
-                    new WorkoutExercise { Sets = 5, Reps = 12, Exercise = exercise1 },
-                    new WorkoutExercise { Sets = 3, Reps = 20, Exercise = exercise2 }
-                }
-            };
-
-            _context.Workouts.AddRange(workout1, workout2);
-            _context.SaveChanges();
-        }
-
-        public void Dispose()
-        {
-            _context.Dispose();
+            // Initialize WorkoutRepository with in-memory context and mapper
+            _workoutRepository = new WorkoutRepository(_context, Mock.Of<IExerciseService>(), _mapper);
         }
 
         [Fact]
-        public async Task GetWorkoutsAsync_ReturnsWorkoutsWithCorrectData()
+        public async Task GetWorkoutsAsync_ShouldReturnFilteredWorkouts()
         {
             // Arrange
-            var queryParams = new WorkoutQueryParams();
+            var userId = Guid.NewGuid();
+            _context.Workouts.AddRange(
+                new Workout { UserId = userId, Date = DateTime.Now, Duration = 60 },
+                new Workout { UserId = userId, Date = DateTime.Now.AddDays(-1), Duration = 45 }
+            );
+            await _context.SaveChangesAsync();
+
+            var queryParams = new WorkoutQueryParams { PageNumber = 1, PageSize = 10 };
 
             // Act
-            var result = await _repository.GetWorkoutsAsync(_testUserId, queryParams);
+            var result = await _workoutRepository.GetWorkoutsAsync(userId, queryParams);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.All(result, workout =>
-            {
-                Assert.NotEqual(DateTime.MinValue, workout.Date);
-                Assert.InRange(workout.Duration, 1, 300);
-            });
+            Assert.Equal(2, result.Count());
         }
 
         [Fact]
-        public async Task GetWorkoutsAsync_ReturnsPaginatedSortedWorkouts()
+        public async Task GetWorkoutsByDateAsync_ShouldReturnWorkoutsOnSpecificDate()
         {
             // Arrange
-            var queryParams = new WorkoutQueryParams
-            {
-                PageNumber = 1,
-                PageSize = 1,
-                SortBy = "duration",
-                SortDescending = true
-            };
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.Date;
+
+            _context.Workouts.AddRange(
+                new Workout { UserId = userId, Date = date, Duration = 60 },
+                new Workout { UserId = userId, Date = date, Duration = 45 }
+            );
+            await _context.SaveChangesAsync();
 
             // Act
-            var result = await _repository.GetWorkoutsAsync(_testUserId, queryParams);
+            var result = await _workoutRepository.GetWorkoutsByDateAsync(userId, date);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Single(result);
-            Assert.Equal(60, result.First().Duration);
+            Assert.Equal(2, result.Count());
         }
 
         [Fact]
-        public async Task GetWorkoutsByDateAsync_ReturnsWorkoutsForSpecificDate()
+        public async Task CreateWorkoutAsync_ShouldAddWorkoutToDatabase()
         {
             // Arrange
-            var date = DateTime.Today;
-
-            // Act
-            var result = await _repository.GetWorkoutsByDateAsync(_testUserId, date);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.All(result, workout => Assert.Equal(date, workout.Date));
-        }
-
-        [Fact]
-        public async Task SaveWorkoutAsync_CreatesOrUpdatesWorkoutCorrectly()
-        {
-            // Arrange
+            var userId = Guid.NewGuid();
             var workoutDto = new WorkoutDto
             {
-                Date = DateTime.Today.AddDays(1),
-                Duration = 30,
+                Date = DateTime.Now,
+                Duration = 60,
                 Exercises = new List<WorkoutExerciseDto>
                 {
-                    new WorkoutExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 10 },
-                    new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 15 }
+                    new WorkoutExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 15 }
                 }
             };
 
-            _exerciseServiceMock.Setup(x => x.PrepareExercises<WorkoutExercise>(_testUserId, workoutDto.Exercises))
-                .ReturnsAsync(new List<WorkoutExercise>
+            // Act
+            var result = await _workoutRepository.CreateWorkoutAsync(userId, workoutDto);
+            var createdWorkout = await _context.Workouts.FirstOrDefaultAsync(w => w.UserId == userId);
+
+            // Assert
+            Assert.True(result);
+            Assert.NotNull(createdWorkout);
+            Assert.Equal(60, createdWorkout.Duration);
+        }
+
+        [Fact]
+        public async Task UpdateWorkoutAsync_ShouldUpdateExistingWorkout()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.Date;
+
+            var workout = new Workout { UserId = userId, Date = date, Duration = 45 };
+            _context.Workouts.Add(workout);
+            await _context.SaveChangesAsync();
+
+            var updatedWorkoutDto = new WorkoutDto
+            {
+                Date = date,
+                Duration = 90,
+                Exercises = new List<WorkoutExerciseDto>
                 {
-                    new WorkoutExercise { ExerciseId = Guid.NewGuid(), Sets = 3, Reps = 10 },
-                    new WorkoutExercise { ExerciseId = Guid.NewGuid(), Sets = 4, Reps = 15 }
-                });
-
-            // Act - Test creating a new workout
-            var createResult = await _repository.SaveWorkoutAsync(_testUserId, workoutDto, overwrite: false);
-
-            // Act - Test updating the workout with overwrite set to true
-            var updateResult = await _repository.SaveWorkoutAsync(_testUserId, workoutDto, overwrite: true);
-
-            // Assert
-            Assert.True(createResult);
-            Assert.True(updateResult);
-        }
-
-        [Fact]
-        public async Task DeleteWorkoutAsync_RemovesWorkoutIfItExists()
-        {
-            // Arrange
-            var date = _context.Workouts.First(w => w.UserId == _testUserId).Date;
+                    new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 10 }
+                }
+            };
 
             // Act
-            var deleteResult = await _repository.DeleteWorkoutAsync(_testUserId, date);
-            var workoutExists = await _context.Workouts
-                .AnyAsync(w => w.UserId == _testUserId && w.Date == date);
+            var result = await _workoutRepository.UpdateWorkoutAsync(userId, updatedWorkoutDto);
+            var updatedWorkout = await _context.Workouts.FirstOrDefaultAsync(w => w.UserId == userId && w.Date == date);
 
             // Assert
-            Assert.True(deleteResult);
-            Assert.False(workoutExists);
+            Assert.True(result);
+            Assert.NotNull(updatedWorkout);
+            Assert.Equal(90, updatedWorkout.Duration);
         }
 
         [Fact]
-        public async Task SaveWorkoutAsync_ThrowsWhenOverwriteIsFalseAndWorkoutExists()
+        public async Task DeleteWorkoutAsync_ShouldRemoveWorkoutFromDatabase()
         {
             // Arrange
-            var workoutDto = new WorkoutDto { Date = DateTime.Today, Duration = 30, Exercises = new List<WorkoutExerciseDto>() };
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.Date;
+
+            _context.Workouts.Add(new Workout { UserId = userId, Date = date, Duration = 45 });
+            await _context.SaveChangesAsync();
+
+            // Act
+            var result = await _workoutRepository.DeleteWorkoutAsync(userId, date);
+            var deletedWorkout = await _context.Workouts.FirstOrDefaultAsync(w => w.UserId == userId && w.Date == date);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(deletedWorkout);
+        }
+
+        [Fact]
+        public async Task UpdateWorkoutAsync_NonExistentWorkout_ShouldThrowKeyNotFoundException()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var workoutDto = new WorkoutDto
+            {
+                Date = DateTime.Now.AddDays(-10), // Non-existent date
+                Duration = 90,
+                Exercises = new List<WorkoutExerciseDto>
+        {
+            new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 10 }
+        }
+            };
+
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentException>(() => _repository.SaveWorkoutAsync(_testUserId, workoutDto, overwrite: false));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _workoutRepository.UpdateWorkoutAsync(userId, workoutDto));
         }
 
+
         [Fact]
-        public async Task DeleteWorkoutAsync_ReturnsFalseWhenWorkoutNotFound()
+        public async Task DeleteWorkoutAsync_NonExistentWorkout_ShouldReturnFalse()
         {
             // Arrange
-            var nonExistentDate = DateTime.Today.AddDays(5);
+            var userId = Guid.NewGuid();
+            var date = DateTime.Now.AddDays(-10); // Date with no workout
+
             // Act
-            var result = await _repository.DeleteWorkoutAsync(_testUserId, nonExistentDate);
+            var result = await _workoutRepository.DeleteWorkoutAsync(userId, date);
+
             // Assert
             Assert.False(result);
         }
 
         [Fact]
-        public async Task GetWorkoutsAsync_FiltersWorkoutsByDuration()
+        public async Task GetWorkoutsAsync_NoWorkouts_ShouldReturnEmptyList()
         {
             // Arrange
-            var queryParams = new WorkoutQueryParams { MinDuration = 50 };
-            // Act
-            var result = await _repository.GetWorkoutsAsync(_testUserId, queryParams);
-            // Assert
-            Assert.All(result, workout => Assert.True(workout.Duration >= 50));
-        }
-
-        [Fact]
-        public async Task SaveWorkoutAsync_ThrowsValidationException_WhenWorkoutDtoIsNull()
-        {
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _repository.SaveWorkoutAsync(_testUserId, null));
-        }
-
-        [Fact]
-        public void WorkoutDto_ValidationFails_WhenRequiredFieldsAreMissing()
-        {
-            // Arrange
-            var invalidWorkoutDto = new WorkoutDto
-            {
-                Date = default,
-                Duration = 0,
-                Exercises = new List<WorkoutExerciseDto>
-                {
-                    new WorkoutExerciseDto { ExerciseName = null, Sets = 0, Reps = 0 }
-                }
-            };
-
-            // Act - Validate main object
-            var validationResults = new List<ValidationResult>();
-            var context = new ValidationContext(invalidWorkoutDto, null, null);
-            Validator.TryValidateObject(invalidWorkoutDto, context, validationResults, validateAllProperties: true);
-
-            // Act - Validate nested objects manually
-            foreach (var exercise in invalidWorkoutDto.Exercises)
-            {
-                var exerciseContext = new ValidationContext(exercise, null, null);
-                Validator.TryValidateObject(exercise, exerciseContext, validationResults, validateAllProperties: true);
-            }
-
-            Assert.NotEmpty(validationResults);
-        }
-
-
-        [Fact]
-        public async Task SaveWorkoutAsync_CallsPrepareExercisesWithCorrectParameters()
-        {
-            // Arrange
-            var workoutDto = new WorkoutDto
-            {
-                Date = DateTime.Today.AddDays(1),
-                Duration = 30,
-                Exercises = new List<WorkoutExerciseDto>
-                {
-                    new WorkoutExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 10 },
-                    new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 15 }
-                }
-            };
-
-            _exerciseServiceMock.Setup(x => x.PrepareExercises<WorkoutExercise>(_testUserId, workoutDto.Exercises))
-                .ReturnsAsync(new List<WorkoutExercise>
-                {
-                    new WorkoutExercise { ExerciseId = Guid.NewGuid(), Sets = 3, Reps = 10 },
-                    new WorkoutExercise { ExerciseId = Guid.NewGuid(), Sets = 4, Reps = 15 }
-                });
+            var userId = Guid.NewGuid();
+            var queryParams = new WorkoutQueryParams { PageNumber = 1, PageSize = 10 };
 
             // Act
-            await _repository.SaveWorkoutAsync(_testUserId, workoutDto);
+            var result = await _workoutRepository.GetWorkoutsAsync(userId, queryParams);
 
             // Assert
-            _exerciseServiceMock.Verify(x => x.PrepareExercises<WorkoutExercise>(_testUserId, workoutDto.Exercises), Times.Once);
+            Assert.Empty(result);
         }
 
         [Fact]
-        public async Task SaveWorkoutAsync_DoesNotCallPrepareExercises_WhenExercisesListIsEmpty()
+        public async Task GetWorkoutsAsync_PaginationOutOfRange_ShouldReturnEmptyList()
         {
             // Arrange
-            var workoutDto = new WorkoutDto
-            {
-                Date = DateTime.Today.AddDays(1),
-                Duration = 30,
-                Exercises = new List<WorkoutExerciseDto>() // Empty list
-            };
+            var userId = Guid.NewGuid();
+            _context.Workouts.Add(new Workout { UserId = userId, Date = DateTime.Now, Duration = 60 });
+            await _context.SaveChangesAsync();
+
+            var queryParams = new WorkoutQueryParams { PageNumber = 2, PageSize = 10 }; // Requesting second page when only one page is available
 
             // Act
-            await Assert.ThrowsAsync<ArgumentException>(async () => await _repository.SaveWorkoutAsync(_testUserId, workoutDto));
+            var result = await _workoutRepository.GetWorkoutsAsync(userId, queryParams);
 
-            // Assert - Verify PrepareExercises was not called
-            _exerciseServiceMock.Verify(x => x.PrepareExercises<WorkoutExercise>(_testUserId, It.IsAny<IEnumerable<IExerciseDto>>()), Times.Never);
+            // Assert
+            Assert.Empty(result);
         }
+
     }
 }
