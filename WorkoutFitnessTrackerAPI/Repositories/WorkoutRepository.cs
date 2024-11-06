@@ -38,11 +38,11 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             return _mapper.Map<IEnumerable<WorkoutDto>>(workouts);
         }
 
-        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
+        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime? date)
         {
             var workouts = await _context.Workouts
                 .AsNoTracking()
-                .Where(w => w.UserId == userId && w.Date.Date == date.Date)
+                .Where(w => w.UserId == userId && w.Date.Date == date.Value.Date)
                 .Include(w => w.WorkoutExercises)
                     .ThenInclude(we => we.Exercise)
                 .ToListAsync();
@@ -52,8 +52,6 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
         public async Task<bool> CreateWorkoutAsync(Guid userId, WorkoutDto workoutDto)
         {
-            if (workoutDto == null) throw new ArgumentNullException(nameof(workoutDto));
-
             var exercisesInWorkout = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
             var workout = _mapper.Map<Workout>(workoutDto);
             workout.UserId = userId;
