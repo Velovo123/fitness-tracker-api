@@ -162,15 +162,14 @@ namespace WorkoutFitnessTrackerAPI.Tests.Repositories
                 Date = DateTime.Now.AddDays(-10), // Non-existent date
                 Duration = 90,
                 Exercises = new List<WorkoutExerciseDto>
-        {
-            new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 10 }
-        }
+                {
+                    new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 10 }
+                }
             };
 
             // Act & Assert
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _workoutRepository.UpdateWorkoutAsync(userId, workoutDto));
         }
-
 
         [Fact]
         public async Task DeleteWorkoutAsync_NonExistentWorkout_ShouldReturnFalse()
@@ -216,6 +215,5 @@ namespace WorkoutFitnessTrackerAPI.Tests.Repositories
             // Assert
             Assert.Empty(result);
         }
-
     }
 }
