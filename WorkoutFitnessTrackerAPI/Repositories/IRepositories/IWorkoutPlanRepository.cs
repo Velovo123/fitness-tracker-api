@@ -1,13 +1,14 @@
-﻿using WorkoutFitnessTrackerAPI.Models.Dto_s;
+﻿using WorkoutFitnessTrackerAPI.Models;
+using WorkoutFitnessTrackerAPI.Models.Dto_s;
 
 namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
 {
     public interface IWorkoutPlanRepository
     {
-        Task<IEnumerable<WorkoutPlanDto>> GetWorkoutPlansAsync(Guid userId, WorkoutPlanQueryParams queryParams);
-        Task<WorkoutPlanDto?> GetWorkoutPlanByNameAsync(Guid userId, string planName);
-        Task<bool> CreateWorkoutPlanAsync(Guid userId, WorkoutPlanDto workoutPlanDto);
-        Task<bool> UpdateWorkoutPlanAsync(Guid userId, WorkoutPlanDto workoutPlanDto);
+        Task<IEnumerable<WorkoutPlan>> GetWorkoutPlansAsync(Guid userId, WorkoutPlanQueryParams queryParams);
+        Task<WorkoutPlan?> GetWorkoutPlanByNameAsync(Guid userId, string planName);
+        Task<bool> CreateWorkoutPlanAsync(WorkoutPlan workoutPlan);
+        Task<bool> UpdateWorkoutPlanAsync(WorkoutPlan workoutPlan);
         Task<bool> DeleteWorkoutPlanAsync(Guid userId, string planName);
     }
 }

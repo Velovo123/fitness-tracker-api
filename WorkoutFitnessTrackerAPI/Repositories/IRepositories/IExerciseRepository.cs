@@ -1,12 +1,13 @@
-﻿using WorkoutFitnessTracker.API.Models.Dto_s.Exercise;
-using WorkoutFitnessTrackerAPI.Models;
+﻿using WorkoutFitnessTrackerAPI.Models;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
 {
     public interface IExerciseRepository
     {
-        Task<ExerciseDto?> GetByNameAsync(string name);
-        Task<ExerciseDto> AddAsync(ExerciseDto exercise);
-        Task<IEnumerable<ExerciseDto>> GetAllExercisesAsync();
+        Task<Exercise?> GetByNameAsync(string name);
+        Task<Exercise> AddAsync(Exercise exercise);
+        Task<IEnumerable<Exercise>> GetAllExercisesAsync();
     }
 }
