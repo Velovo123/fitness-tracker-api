@@ -1,27 +1,22 @@
-﻿using WorkoutFitnessTrackerAPI.Models.Dto_s;
+﻿using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using WorkoutFitnessTrackerAPI.Data;
-using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
-using AutoMapper;
+using WorkoutFitnessTrackerAPI.Models.Dto_s;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
     public class WorkoutRepository : IWorkoutRepository
     {
         private readonly WFTDbContext _context;
-        private readonly IExerciseService _exerciseService;
-        private readonly IMapper _mapper;
 
-        public WorkoutRepository(WFTDbContext context, IExerciseService exerciseService, IMapper mapper)
+        public WorkoutRepository(WFTDbContext context)
         {
             _context = context;
-            _exerciseService = exerciseService;
-            _mapper = mapper;
         }
 
-        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsAsync(Guid userId, WorkoutQueryParams queryParams)
+        public async Task<IEnumerable<Workout>> GetWorkoutsAsync(Guid userId, WorkoutQueryParams queryParams)
         {
             var workoutsQuery = _context.Workouts
                 .Where(w => w.UserId == userId)
@@ -34,61 +29,39 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             workoutsQuery = ApplySorting(workoutsQuery, queryParams);
             workoutsQuery = ApplyPaging(workoutsQuery, queryParams);
 
-            var workouts = await workoutsQuery.ToListAsync();
-            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts);
+            return await workoutsQuery.ToListAsync();
         }
 
-        public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime? date)
+        public async Task<IEnumerable<Workout>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
         {
-            var workouts = await _context.Workouts
+            return await _context.Workouts
                 .AsNoTracking()
-                .Where(w => w.UserId == userId && w.Date.Date == date.Value.Date)
+                .Where(w => w.UserId == userId && w.Date.Date == date.Date)
                 .Include(w => w.WorkoutExercises)
                     .ThenInclude(we => we.Exercise)
                 .ToListAsync();
-
-            return _mapper.Map<IEnumerable<WorkoutDto>>(workouts);
         }
 
-        public async Task<bool> CreateWorkoutAsync(Guid userId, WorkoutDto workoutDto)
+        public async Task<bool> CreateWorkoutAsync(Workout workout)
         {
-            var exercisesInWorkout = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
-            var workout = _mapper.Map<Workout>(workoutDto);
-            workout.UserId = userId;
-            workout.WorkoutExercises = exercisesInWorkout;
-
             _context.Workouts.Add(workout);
             return await _context.SaveChangesAsync() > 0;
         }
 
-        public async Task<bool> UpdateWorkoutAsync(Guid userId, WorkoutDto workoutDto)
+        public async Task<bool> UpdateWorkoutAsync(Workout workout)
         {
-            var existingWorkout = await FindWorkoutAsync(userId, workoutDto.Date);
-            if (existingWorkout == null) throw new KeyNotFoundException("Workout not found.");
-
-            var exercisesInWorkout = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
-
-            existingWorkout.Duration = workoutDto.Duration;
-            _context.WorkoutExercises.RemoveRange(existingWorkout.WorkoutExercises);
-            existingWorkout.WorkoutExercises = exercisesInWorkout;
-
+            _context.Workouts.Update(workout);
             return await _context.SaveChangesAsync() > 0;
         }
 
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
         {
-            var workout = await FindWorkoutAsync(userId, date);
+            var workout = await _context.Workouts
+                .FirstOrDefaultAsync(w => w.UserId == userId && w.Date == date);
             if (workout == null) return false;
 
             _context.Workouts.Remove(workout);
             return await _context.SaveChangesAsync() > 0;
-        }
-
-        private async Task<Workout?> FindWorkoutAsync(Guid userId, DateTime date)
-        {
-            return await _context.Workouts
-                .Include(w => w.WorkoutExercises)
-                .FirstOrDefaultAsync(w => w.UserId == userId && w.Date == date);
         }
 
         private IQueryable<Workout> ApplyFilters(IQueryable<Workout> query, WorkoutQueryParams queryParams)

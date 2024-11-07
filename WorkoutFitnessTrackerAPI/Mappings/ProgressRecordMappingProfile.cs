@@ -9,9 +9,11 @@ namespace WorkoutFitnessTrackerAPI.Mappings
         public ProgressRecordMappingProfile()
         {
             CreateMap<ProgressRecord, ProgressRecordDto>()
-                .ForMember(dest => dest.ExerciseName, opt => opt.MapFrom(src => src.Exercise.Name))
-                .ForMember(dest => dest.Date, opt => opt.MapFrom(src => src.Date))
-                .ForMember(dest => dest.Progress, opt => opt.MapFrom(src => src.Progress));
+                .ForMember(dest => dest.ExerciseName, opt => opt.MapFrom(src => src.Exercise.Name));
+
+            CreateMap<ProgressRecordDto, ProgressRecord>()
+                .ForMember(dest => dest.ExerciseId, opt => opt.Ignore()) 
+                .ForMember(dest => dest.Exercise, opt => opt.Ignore()); 
         }
     }
 }
