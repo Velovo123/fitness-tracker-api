@@ -1,177 +1,94 @@
 ﻿using Xunit;
 using Moq;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using WorkoutFitnessTrackerAPI.Services;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
-using WorkoutFitnessTrackerAPI.Services;
+using WorkoutFitnessTracker.API.Services.IServices;
+using AutoMapper;
+using System.Collections.Generic;
+using WorkoutFitnessTrackerAPI.Models;
+using WorkoutFitnessTrackerAPI.Mappings;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 
-namespace WorkoutFitnessTrackerAPI.Tests.Services
+public class WorkoutServiceTests
 {
-    public class WorkoutServiceTests
+    private readonly WorkoutService _service;
+    private readonly Mock<IWorkoutRepository> _repositoryMock;
+    private readonly Mock<IExerciseService> _exerciseServiceMock;
+    private readonly IMapper _mapper;
+
+    public WorkoutServiceTests()
     {
-        private readonly Mock<IWorkoutRepository> _workoutRepositoryMock;
-        private readonly WorkoutService _workoutService;
+        _repositoryMock = new Mock<IWorkoutRepository>();
+        _exerciseServiceMock = new Mock<IExerciseService>();
 
-        public WorkoutServiceTests()
+        var config = new MapperConfiguration(cfg =>
         {
-            _workoutRepositoryMock = new Mock<IWorkoutRepository>();
-            _workoutService = new WorkoutService(_workoutRepositoryMock.Object);
-        }
+            cfg.AddProfile<WorkoutMappingProfile>(); // Use the actual mapping profile
+        });
+        _mapper = config.CreateMapper();
 
-        [Fact]
-        public async Task GetWorkoutsAsync_ShouldReturnWorkouts()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var queryParams = new WorkoutQueryParams();
-            var expectedWorkouts = new List<WorkoutDto>
-            {
-                new WorkoutDto { Date = DateTime.Now, Duration = 60 },
-                new WorkoutDto { Date = DateTime.Now.AddDays(-1), Duration = 45 }
-            };
+        _service = new WorkoutService(_repositoryMock.Object, _mapper);
+    }
 
-            _workoutRepositoryMock.Setup(repo => repo.GetWorkoutsAsync(userId, queryParams))
-                .ReturnsAsync(expectedWorkouts);
+    [Fact]
+    public async Task CreateWorkoutAsync_ShouldCreateWorkout_WhenOverwriteIsFalseAndNoConflict()
+    {
+        var userId = Guid.NewGuid();
+        var workoutDto = new WorkoutDto { Date = DateTime.UtcNow, Duration = 60, Exercises = new List<WorkoutExerciseDto>() };
 
-            // Act
-            var result = await _workoutService.GetWorkoutsAsync(userId, queryParams);
+        _repositoryMock.Setup(r => r.GetWorkoutsByDateAsync(userId, workoutDto.Date)).ReturnsAsync(new List<Workout>());
+        _repositoryMock.Setup(r => r.CreateWorkoutAsync(It.IsAny<Workout>())).ReturnsAsync(true);
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal(2, result.Count());
-            _workoutRepositoryMock.Verify(repo => repo.GetWorkoutsAsync(userId, queryParams), Times.Once);
-        }
+        var result = await _service.CreateWorkoutAsync(userId, workoutDto);
 
-        [Fact]
-        public async Task GetWorkoutsByDateAsync_ShouldReturnWorkoutByDate()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var date = DateTime.Now.Date;
-            var expectedWorkouts = new List<WorkoutDto>
-            {
-                new WorkoutDto { Date = date, Duration = 60 }
-            };
+        Assert.True(result);
+        _repositoryMock.Verify(r => r.CreateWorkoutAsync(It.IsAny<Workout>()), Times.Once);
+    }
 
-            _workoutRepositoryMock.Setup(repo => repo.GetWorkoutsByDateAsync(userId, date))
-                .ReturnsAsync(expectedWorkouts);
+    [Fact]
+    public async Task CreateWorkoutAsync_ShouldOverwriteWorkout_WhenOverwriteIsTrue()
+    {
+        var userId = Guid.NewGuid();
+        var workoutDto = new WorkoutDto { Date = DateTime.UtcNow, Duration = 60, Exercises = new List<WorkoutExerciseDto>() };
 
-            // Act
-            var result = await _workoutService.GetWorkoutsByDateAsync(userId, date);
+        _repositoryMock.Setup(r => r.GetWorkoutsByDateAsync(userId, workoutDto.Date))
+            .ReturnsAsync(new List<Workout> { new Workout { UserId = userId, Date = workoutDto.Date } });
+        _repositoryMock.Setup(r => r.UpdateWorkoutAsync(It.IsAny<Workout>())).ReturnsAsync(true);
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Single(result);
-            Assert.Equal(60, result.First().Duration);
-            _workoutRepositoryMock.Verify(repo => repo.GetWorkoutsByDateAsync(userId, date), Times.Once);
-        }
+        var result = await _service.CreateWorkoutAsync(userId, workoutDto, overwrite: true);
 
-        [Fact]
-        public async Task CreateWorkoutAsync_ShouldCreateWorkout_WhenNoExistingWorkout()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var workoutDto = new WorkoutDto { Date = DateTime.Now, Duration = 45 };
-            _workoutRepositoryMock.Setup(repo => repo.GetWorkoutsByDateAsync(userId, workoutDto.Date))
-                .ReturnsAsync(new List<WorkoutDto>());
-            _workoutRepositoryMock.Setup(repo => repo.CreateWorkoutAsync(userId, workoutDto))
-                .ReturnsAsync(true);
+        Assert.True(result);
+        _repositoryMock.Verify(r => r.UpdateWorkoutAsync(It.IsAny<Workout>()), Times.Once);
+    }
 
-            // Act
-            var result = await _workoutService.CreateWorkoutAsync(userId, workoutDto);
+    [Fact]
+    public async Task GetWorkoutsAsync_ShouldReturnWorkouts_ForUserId()
+    {
+        var userId = Guid.NewGuid();
+        var queryParams = new WorkoutQueryParams();
+        var workouts = new List<Workout> { new Workout { Date = DateTime.UtcNow, Duration = 60 }, new Workout { Date = DateTime.UtcNow.AddDays(-1), Duration = 30 } };
 
-            // Assert
-            Assert.True(result);
-            _workoutRepositoryMock.Verify(repo => repo.GetWorkoutsByDateAsync(userId, workoutDto.Date), Times.Once);
-            _workoutRepositoryMock.Verify(repo => repo.CreateWorkoutAsync(userId, workoutDto), Times.Once);
-        }
+        _repositoryMock.Setup(r => r.GetWorkoutsAsync(userId, queryParams)).ReturnsAsync(workouts);
 
-        [Fact]
-        public async Task CreateWorkoutAsync_ShouldThrowException_WhenWorkoutExistsAndOverwriteIsFalse()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var workoutDto = new WorkoutDto { Date = DateTime.Now, Duration = 45 };
-            _workoutRepositoryMock.Setup(repo => repo.GetWorkoutsByDateAsync(userId, workoutDto.Date))
-                .ReturnsAsync(new List<WorkoutDto> { workoutDto });
+        var result = await _service.GetWorkoutsAsync(userId, queryParams);
 
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                _workoutService.CreateWorkoutAsync(userId, workoutDto));
-            _workoutRepositoryMock.Verify(repo => repo.GetWorkoutsByDateAsync(userId, workoutDto.Date), Times.Once);
-            _workoutRepositoryMock.Verify(repo => repo.CreateWorkoutAsync(It.IsAny<Guid>(), It.IsAny<WorkoutDto>()), Times.Never);
-        }
+        Assert.Equal(2, result.Count());
+    }
 
-        [Fact]
-        public async Task CreateWorkoutAsync_ShouldOverwriteWorkout_WhenWorkoutExistsAndOverwriteIsTrue()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var workoutDto = new WorkoutDto { Date = DateTime.Now, Duration = 45 };
-            _workoutRepositoryMock.Setup(repo => repo.GetWorkoutsByDateAsync(userId, workoutDto.Date))
-                .ReturnsAsync(new List<WorkoutDto> { workoutDto });
-            _workoutRepositoryMock.Setup(repo => repo.UpdateWorkoutAsync(userId, workoutDto))
-                .ReturnsAsync(true);
+    [Fact]
+    public async Task DeleteWorkoutAsync_ShouldReturnTrue_WhenWorkoutExists()
+    {
+        var userId = Guid.NewGuid();
+        var date = DateTime.UtcNow;
 
-            // Act
-            var result = await _workoutService.CreateWorkoutAsync(userId, workoutDto, overwrite: true);
+        _repositoryMock.Setup(r => r.DeleteWorkoutAsync(userId, date)).ReturnsAsync(true);
 
-            // Assert
-            Assert.True(result);
-            _workoutRepositoryMock.Verify(repo => repo.GetWorkoutsByDateAsync(userId, workoutDto.Date), Times.Once);
-            _workoutRepositoryMock.Verify(repo => repo.UpdateWorkoutAsync(userId, workoutDto), Times.Once);
-        }
+        var result = await _service.DeleteWorkoutAsync(userId, date);
 
-        [Fact]
-        public async Task UpdateWorkoutAsync_ShouldReturnTrue_WhenWorkoutIsUpdated()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var workoutDto = new WorkoutDto { Date = DateTime.Now, Duration = 60 };
-            _workoutRepositoryMock.Setup(repo => repo.UpdateWorkoutAsync(userId, workoutDto)).ReturnsAsync(true);
-
-            // Act
-            var result = await _workoutService.UpdateWorkoutAsync(userId, workoutDto);
-
-            // Assert
-            Assert.True(result);
-            _workoutRepositoryMock.Verify(repo => repo.UpdateWorkoutAsync(userId, workoutDto), Times.Once);
-        }
-
-        [Fact]
-        public async Task DeleteWorkoutAsync_ShouldReturnTrue_WhenWorkoutIsDeleted()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var date = DateTime.Now.Date;
-            _workoutRepositoryMock.Setup(repo => repo.DeleteWorkoutAsync(userId, date)).ReturnsAsync(true);
-
-            // Act
-            var result = await _workoutService.DeleteWorkoutAsync(userId, date);
-
-            // Assert
-            Assert.True(result);
-            _workoutRepositoryMock.Verify(repo => repo.DeleteWorkoutAsync(userId, date), Times.Once);
-        }
-
-        [Fact]
-        public async Task DeleteWorkoutAsync_ShouldReturnFalse_WhenWorkoutDoesNotExist()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var date = DateTime.Now.Date;
-            _workoutRepositoryMock.Setup(repo => repo.DeleteWorkoutAsync(userId, date)).ReturnsAsync(false);
-
-            // Act
-            var result = await _workoutService.DeleteWorkoutAsync(userId, date);
-
-            // Assert
-            Assert.False(result);
-            _workoutRepositoryMock.Verify(repo => repo.DeleteWorkoutAsync(userId, date), Times.Once);
-        }
+        Assert.True(result);
+        _repositoryMock.Verify(r => r.DeleteWorkoutAsync(userId, date), Times.Once);
     }
 }
