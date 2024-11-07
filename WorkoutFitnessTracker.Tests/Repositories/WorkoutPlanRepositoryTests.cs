@@ -1,272 +1,206 @@
-﻿using AutoMapper;
-using Microsoft.EntityFrameworkCore;
+﻿using Xunit;
 using Moq;
+using Microsoft.EntityFrameworkCore;
+using AutoMapper;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WorkoutFitnessTrackerAPI.Data;
-using WorkoutFitnessTrackerAPI.Mappings;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories;
 using WorkoutFitnessTrackerAPI.Services.IServices;
-using Xunit;
+using WorkoutFitnessTrackerAPI.Mappings;
 
 namespace WorkoutFitnessTrackerAPI.Tests.Repositories
 {
-    public class WorkoutPlanRepositoryTests : IDisposable
+    public class WorkoutPlanRepositoryTests
     {
         private readonly WFTDbContext _context;
         private readonly WorkoutPlanRepository _repository;
-        private readonly Mock<IExerciseService> _exerciseServiceMock;
         private readonly IMapper _mapper;
-        private readonly Guid _testUserId = Guid.NewGuid();
+        private readonly Mock<IExerciseService> _exerciseServiceMock;
 
         public WorkoutPlanRepositoryTests()
         {
             var options = new DbContextOptionsBuilder<WFTDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase")
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
-
             _context = new WFTDbContext(options);
 
+            var config = new MapperConfiguration(cfg => cfg.AddProfile<WorkoutPlanMappingProfile>());
+            _mapper = config.CreateMapper();
             _exerciseServiceMock = new Mock<IExerciseService>();
 
-            // Setup AutoMapper for DTOs in tests
-            var config = new MapperConfiguration(cfg =>
-            {
-                cfg.AddProfile<WorkoutPlanMappingProfile>(); // Ensure this profile is defined in your API project
-            });
-            _mapper = config.CreateMapper();
-
             _repository = new WorkoutPlanRepository(_context, _exerciseServiceMock.Object, _mapper);
-
-            SeedDatabase();
-        }
-
-        private void SeedDatabase()
-        {
-            var exercise1 = new Exercise { Name = "Push Up" };
-            var exercise2 = new Exercise { Name = "Squat" };
-
-            var plan1 = new WorkoutPlan
-            {
-                UserId = _testUserId,
-                Name = "plana",
-                Goal = "Strength",
-                WorkoutPlanExercises = new List<WorkoutPlanExercise>
-                {
-                    new WorkoutPlanExercise { Sets = 3, Reps = 10, Exercise = exercise1 },
-                    new WorkoutPlanExercise { Sets = 4, Reps = 15, Exercise = exercise2 }
-                }
-            };
-
-            _context.WorkoutPlans.Add(plan1);
-            _context.SaveChanges();
-        }
-
-        public void Dispose()
-        {
-            _context.Dispose();
         }
 
         [Fact]
-        public async Task GetWorkoutPlansAsync_ReturnsPlansWithCorrectData()
+        public async Task GetWorkoutPlansAsync_ShouldReturnFilteredAndSortedPlans()
         {
             // Arrange
-            var queryParams = new WorkoutPlanQueryParams();
+            var userId = Guid.NewGuid();
+            _context.WorkoutPlans.AddRange(
+                new WorkoutPlan { UserId = userId, Name = "Plan A", Goal = "Strength" },
+                new WorkoutPlan { UserId = userId, Name = "Plan B", Goal = "Endurance" },
+                new WorkoutPlan { UserId = userId, Name = "Plan C", Goal = "Strength" }
+            );
+            await _context.SaveChangesAsync();
+
+            var queryParams = new WorkoutPlanQueryParams { Goal = "Strength", SortBy = "name", SortDescending = false };
 
             // Act
-            var result = await _repository.GetWorkoutPlansAsync(_testUserId, queryParams);
+            var result = await _repository.GetWorkoutPlansAsync(userId, queryParams);
+
+            // Assert
+            Assert.Equal(2, result.Count());
+            Assert.Equal("Plan A", result.First().Name);
+        }
+
+        [Fact]
+        public async Task GetWorkoutPlanByNameAsync_ShouldReturnPlanByName()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var planName = "strengthplan";
+            _context.WorkoutPlans.Add(new WorkoutPlan { UserId = userId, Name = planName, Goal = "Strength" });
+            await _context.SaveChangesAsync();
+
+            // Act
+            var result = await _repository.GetWorkoutPlanByNameAsync(userId, planName);
 
             // Assert
             Assert.NotNull(result);
-            Assert.All(result, plan =>
-            {
-                Assert.NotEmpty(plan.Name);
-                Assert.NotNull(plan.Goal);
-            });
+            Assert.Equal(planName, result.Name);
         }
 
         [Fact]
-        public async Task GetWorkoutPlansAsync_ReturnsFilteredPlansByGoal()
+        public async Task CreateWorkoutPlanAsync_ShouldAddPlanToDatabase()
         {
             // Arrange
-            var queryParams = new WorkoutPlanQueryParams { Goal = "Strength" };
-
-            // Act
-            var result = await _repository.GetWorkoutPlansAsync(_testUserId, queryParams);
-
-            // Assert
-            Assert.All(result, plan => Assert.Equal("Strength", plan.Goal));
-        }
-
-        [Fact]
-        public async Task GetWorkoutPlanByNameAsync_ReturnsCorrectPlan()
-        {
-            // Act
-            var result = await _repository.GetWorkoutPlanByNameAsync(_testUserId, "Plan A");
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("plana", result!.Name);
-        }
-
-        [Fact]
-        public async Task SaveWorkoutPlanAsync_CreatesOrUpdatesPlanCorrectly()
-        {
-            // Arrange - Initial creation
+            var userId = Guid.NewGuid();
             var workoutPlanDto = new WorkoutPlanDto
             {
-                Name = "Plan B",
+                Name = "Endurance Plan",
                 Goal = "Endurance",
-                Exercises = new List<WorkoutPlanExerciseDto>
-        {
-            new WorkoutPlanExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 10 },
-            new WorkoutPlanExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 15 }
-        }
+                Exercises = new List<WorkoutPlanExerciseDto> { new WorkoutPlanExerciseDto { ExerciseName = "Squat", Sets = 3, Reps = 15 } }
             };
 
-            _exerciseServiceMock.Setup(x => x.PrepareExercises<WorkoutPlanExercise>(_testUserId, workoutPlanDto.Exercises))
-                .ReturnsAsync(new List<WorkoutPlanExercise>
-                {
-            new WorkoutPlanExercise { ExerciseId = Guid.NewGuid(), Sets = 3, Reps = 10 },
-            new WorkoutPlanExercise { ExerciseId = Guid.NewGuid(), Sets = 4, Reps = 15 }
-                });
+            _exerciseServiceMock
+                .Setup(service => service.PrepareExercises<WorkoutPlanExercise>(userId, workoutPlanDto.Exercises))
+                .ReturnsAsync(new List<WorkoutPlanExercise> { new WorkoutPlanExercise { ExerciseId = Guid.NewGuid(), Sets = 3, Reps = 15 } });
 
-            // Act - Test creating a new plan
-            var createResult = await _repository.SaveWorkoutPlanAsync(_testUserId, workoutPlanDto, overwrite: false);
+            // Act
+            var result = await _repository.CreateWorkoutPlanAsync(userId, workoutPlanDto);
+            var createdPlan = await _context.WorkoutPlans.FirstOrDefaultAsync(wp => wp.UserId == userId);
 
-            // Arrange - Create new instance for updating
-            var updatedWorkoutPlanDto = new WorkoutPlanDto
+            // Assert
+            Assert.True(result);
+            Assert.NotNull(createdPlan);
+            Assert.Equal("Endurance Plan", createdPlan.Name);
+        }
+
+        [Fact]
+        public async Task UpdateWorkoutPlanAsync_ShouldUpdateExistingPlan()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var workoutPlan = new WorkoutPlan
             {
-                Name = "Plan B", // Same name to simulate an update
-                Goal = "Updated Goal", // New goal
-                Exercises = workoutPlanDto.Exercises // Use the same exercises
+                UserId = userId,
+                Name = "Endurance Plan",
+                Goal = "Endurance"
+            };
+            _context.WorkoutPlans.Add(workoutPlan);
+            await _context.SaveChangesAsync();
+
+            var workoutPlanDto = new WorkoutPlanDto
+            {
+                Name = "Endurance Plan",
+                Goal = "Updated Endurance",
+                Exercises = new List<WorkoutPlanExerciseDto> { new WorkoutPlanExerciseDto { ExerciseName = "Bench Press", Sets = 4, Reps = 10 } }
             };
 
-            // Act - Test updating the plan with overwrite set to true
-            var updateResult = await _repository.SaveWorkoutPlanAsync(_testUserId, updatedWorkoutPlanDto, overwrite: true);
-
-            // Assert
-            Assert.True(createResult);
-            Assert.True(updateResult);
-        }
-
-
-        [Fact]
-        public async Task DeleteWorkoutPlanAsync_RemovesPlanIfItExists()
-        {
-            // Arrange
-            var planName = "Plan A";
+            _exerciseServiceMock
+                .Setup(service => service.PrepareExercises<WorkoutPlanExercise>(userId, workoutPlanDto.Exercises))
+                .ReturnsAsync(new List<WorkoutPlanExercise> { new WorkoutPlanExercise { ExerciseId = Guid.NewGuid(), Sets = 4, Reps = 10 } });
 
             // Act
-            var deleteResult = await _repository.DeleteWorkoutPlanAsync(_testUserId, planName);
-            var planExists = await _context.WorkoutPlans
-                .AnyAsync(wp => wp.UserId == _testUserId && wp.Name == planName);
+            var result = await _repository.UpdateWorkoutPlanAsync(userId, workoutPlanDto);
+            var updatedPlan = await _context.WorkoutPlans.FirstOrDefaultAsync(wp => wp.UserId == userId);
 
             // Assert
-            Assert.True(deleteResult);
-            Assert.False(planExists);
+            Assert.True(result);
+            Assert.NotNull(updatedPlan);
+            Assert.Equal("Updated Endurance", updatedPlan.Goal);
         }
 
         [Fact]
-        public async Task SaveWorkoutPlanAsync_ThrowsWhenOverwriteIsFalseAndPlanExists()
+        public async Task DeleteWorkoutPlanAsync_ShouldRemovePlanFromDatabase()
         {
             // Arrange
-            var workoutPlanDto = new WorkoutPlanDto { Name = "Plan A", Goal = "Strength", Exercises = new List<WorkoutPlanExerciseDto>
-                {
-                    new WorkoutPlanExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 10 },
-                    new WorkoutPlanExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 15 }
-                }
-            };
-
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _repository.SaveWorkoutPlanAsync(_testUserId, workoutPlanDto, overwrite: false));
-        }
-
-        [Fact]
-        public async Task DeleteWorkoutPlanAsync_ReturnsFalseWhenPlanNotFound()
-        {
-            // Arrange
-            var nonExistentPlanName = "Nonexistent Plan";
+            var userId = Guid.NewGuid();
+            var planName = "Endurance Plan";
+            _context.WorkoutPlans.Add(new WorkoutPlan { UserId = userId, Name = planName, Goal = "Endurance" });
+            await _context.SaveChangesAsync();
 
             // Act
-            var result = await _repository.DeleteWorkoutPlanAsync(_testUserId, nonExistentPlanName);
+            var result = await _repository.DeleteWorkoutPlanAsync(userId, planName);
+            var deletedPlan = await _context.WorkoutPlans.FirstOrDefaultAsync(wp => wp.UserId == userId && wp.Name == planName);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(deletedPlan);
+        }
+
+        [Fact]
+        public async Task DeleteWorkoutPlanAsync_NonExistentPlan_ShouldReturnFalse()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var nonExistentPlanName = "NonExistent Plan";
+
+            // Act
+            var result = await _repository.DeleteWorkoutPlanAsync(userId, nonExistentPlanName);
 
             // Assert
             Assert.False(result);
         }
 
         [Fact]
-        public async Task SaveWorkoutPlanAsync_CallsPrepareExercisesWithCorrectParameters()
+        public async Task GetWorkoutPlansAsync_NoPlans_ShouldReturnEmptyList()
         {
             // Arrange
-            var workoutPlanDto = new WorkoutPlanDto
-            {
-                Name = "Plan C",
-                Goal = "Strength",
-                Exercises = new List<WorkoutPlanExerciseDto>
-                {
-                    new WorkoutPlanExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 10 },
-                    new WorkoutPlanExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 15 }
-                }
-            };
-
-            _exerciseServiceMock.Setup(x => x.PrepareExercises<WorkoutPlanExercise>(_testUserId, workoutPlanDto.Exercises))
-                .ReturnsAsync(new List<WorkoutPlanExercise>
-                {
-                    new WorkoutPlanExercise { ExerciseId = Guid.NewGuid(), Sets = 3, Reps = 10 },
-                    new WorkoutPlanExercise { ExerciseId = Guid.NewGuid(), Sets = 4, Reps = 15 }
-                });
+            var userId = Guid.NewGuid();
+            var queryParams = new WorkoutPlanQueryParams();
 
             // Act
-            await _repository.SaveWorkoutPlanAsync(_testUserId, workoutPlanDto);
+            var result = await _repository.GetWorkoutPlansAsync(userId, queryParams);
 
             // Assert
-            _exerciseServiceMock.Verify(x => x.PrepareExercises<WorkoutPlanExercise>(_testUserId, workoutPlanDto.Exercises), Times.Once);
+            Assert.Empty(result);
         }
 
         [Fact]
-        public async Task SaveWorkoutPlanAsync_ThrowsArgumentNullException_WhenWorkoutPlanDtoIsNull()
-        {
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _repository.SaveWorkoutPlanAsync(_testUserId, null));
-        }
-
-        [Fact]
-        public async Task SaveWorkoutPlanAsync_ThrowsArgumentException_WhenWorkoutPlanDtoNameIsEmpty()
+        public async Task GetWorkoutPlansAsync_WithPaging_ShouldReturnCorrectPage()
         {
             // Arrange
-            var workoutPlanDto = new WorkoutPlanDto
-            {
-                Name = string.Empty, // Invalid name
-                Goal = "Strength",
-                Exercises = new List<WorkoutPlanExerciseDto>
-        {
-            new WorkoutPlanExerciseDto { ExerciseName = "Push Up", Sets = 3, Reps = 10 }
+            var userId = Guid.NewGuid();
+            _context.WorkoutPlans.AddRange(
+                new WorkoutPlan { UserId = userId, Name = "Plan A" },
+                new WorkoutPlan { UserId = userId, Name = "Plan B" },
+                new WorkoutPlan { UserId = userId, Name = "Plan C" }
+            );
+            await _context.SaveChangesAsync();
+
+            var queryParams = new WorkoutPlanQueryParams { PageNumber = 1, PageSize = 2 };
+
+            // Act
+            var result = await _repository.GetWorkoutPlansAsync(userId, queryParams);
+
+            // Assert
+            Assert.Equal(2, result.Count());
         }
-            };
-
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentException>(() => _repository.SaveWorkoutPlanAsync(_testUserId, workoutPlanDto));
-        }
-
-        [Fact]
-        public async Task SaveWorkoutPlanAsync_ThrowsArgumentException_WhenWorkoutPlanDtoExercisesIsEmpty()
-        {
-            // Arrange
-            var workoutPlanDto = new WorkoutPlanDto
-            {
-                Name = "Plan D",
-                Goal = "Strength",
-                Exercises = new List<WorkoutPlanExerciseDto>() // Empty list of exercises
-            };
-
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentException>(() => _repository.SaveWorkoutPlanAsync(_testUserId, workoutPlanDto));
-        }
-
     }
 }

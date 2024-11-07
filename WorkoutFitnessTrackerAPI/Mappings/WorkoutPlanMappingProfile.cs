@@ -8,19 +8,8 @@ namespace WorkoutFitnessTrackerAPI.Mappings
     {
         public WorkoutPlanMappingProfile()
         {
-            CreateMap<WorkoutPlan, WorkoutPlanDto>()
-                .ForMember(dest => dest.Exercises, opt => opt.MapFrom(src =>
-                    src.WorkoutPlanExercises.Select(wpe => new WorkoutPlanExerciseDto
-                    {
-                        ExerciseName = wpe.Exercise.Name,
-                        Sets = wpe.Sets,
-                        Reps = wpe.Reps
-                    }).ToList()));
-
-            CreateMap<WorkoutPlanExercise, WorkoutPlanExerciseDto>()
-                .ForMember(dest => dest.ExerciseName, opt => opt.MapFrom(src => src.Exercise.Name))
-                .ForMember(dest => dest.Sets, opt => opt.MapFrom(src => src.Sets))
-                .ForMember(dest => dest.Reps, opt => opt.MapFrom(src => src.Reps));
+            CreateMap<WorkoutPlan, WorkoutPlanDto>().ReverseMap();
+            CreateMap<WorkoutPlanExercise, WorkoutPlanExerciseDto>().ReverseMap();
         }
     }
 }
