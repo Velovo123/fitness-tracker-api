@@ -1,124 +1,89 @@
-﻿using AutoMapper;
-using Microsoft.EntityFrameworkCore;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using WorkoutFitnessTracker.API.Mappings;
-using WorkoutFitnessTracker.API.Models.Dto_s.Exercise;
+using Microsoft.EntityFrameworkCore;
 using WorkoutFitnessTrackerAPI.Data;
 using WorkoutFitnessTrackerAPI.Models;
-using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories;
-using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using Xunit;
 
-namespace WorkoutFitnessTracker.Tests.Repositories
+public class ExerciseRepositoryTests
 {
-    public class ExerciseRepositoryTests
+    private readonly WFTDbContext _context;
+    private readonly ExerciseRepository _repository;
+
+    public ExerciseRepositoryTests()
     {
-        private readonly IExerciseRepository _exerciseRepository;
-        private readonly WFTDbContext _context;
-        private readonly IMapper _mapper;
+        // Set up in-memory database options
+        var options = new DbContextOptionsBuilder<WFTDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
 
-        public ExerciseRepositoryTests()
+        _context = new WFTDbContext(options);
+        _repository = new ExerciseRepository(_context);
+    }
+
+    [Fact]
+    public async Task GetByNameAsync_ReturnsExercise_WhenExerciseExists()
+    {
+        // Arrange
+        var exercise = new Exercise { Id = Guid.NewGuid(), Name = "Existing Exercise" };
+        await _context.Exercises.AddAsync(exercise);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _repository.GetByNameAsync("Existing Exercise");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Existing Exercise", result.Name);
+    }
+
+    [Fact]
+    public async Task GetByNameAsync_ReturnsNull_WhenExerciseDoesNotExist()
+    {
+        // Act
+        var result = await _repository.GetByNameAsync("Nonexistent Exercise");
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task AddAsync_AddsExerciseSuccessfully()
+    {
+        // Arrange
+        var exercise = new Exercise { Id = Guid.NewGuid(), Name = "New Exercise" };
+
+        // Act
+        var result = await _repository.AddAsync(exercise);
+        var addedExercise = await _context.Exercises.FirstOrDefaultAsync(e => e.Name == "New Exercise");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("New Exercise", result.Name);
+        Assert.Equal("New Exercise", addedExercise?.Name);
+    }
+
+    [Fact]
+    public async Task GetAllExercisesAsync_ReturnsAllExercises()
+    {
+        // Arrange
+        var exercises = new List<Exercise>
         {
-            var mapperConfig = new MapperConfiguration(cfg =>
-            {
-                cfg.AddProfile(new ExerciseProfile());
-            });
-            _mapper = mapperConfig.CreateMapper();
+            new Exercise { Id = Guid.NewGuid(), Name = "Exercise 1" },
+            new Exercise { Id = Guid.NewGuid(), Name = "Exercise 2" }
+        };
+        await _context.Exercises.AddRangeAsync(exercises);
+        await _context.SaveChangesAsync();
 
-            var options = new DbContextOptionsBuilder<WFTDbContext>()
-                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-                .Options;
+        // Act
+        var result = await _repository.GetAllExercisesAsync();
 
-            _context = new WFTDbContext(options);
-            _exerciseRepository = new ExerciseRepository(_context, _mapper);
-        }
-
-        [Fact]
-        public async Task AddAsync_ShouldAddExercise_WhenExerciseIsValid()
-        {
-            // Arrange
-            var exerciseDto = new ExerciseDto
-            {
-                Name = "Push Up",
-                Type = "Strength"
-            };
-
-            // Act
-            var result = await _exerciseRepository.AddAsync(exerciseDto);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Push Up", result.Name);
-            Assert.Equal("Strength", result.Type);
-
-            // Verify that it was added to the database
-            var addedExercise = await _context.Exercises.FirstOrDefaultAsync(e => e.Name == "Push Up");
-            Assert.NotNull(addedExercise);
-        }
-
-        [Fact]
-        public async Task AddAsync_ShouldThrowException_WhenDuplicateExerciseNameExists()
-        {
-            // Arrange
-            var exerciseDto = new ExerciseDto { Name = "Bench Press", Type = "Strength" };
-            await _exerciseRepository.AddAsync(exerciseDto);
-
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _exerciseRepository.AddAsync(exerciseDto));
-        }
-
-        [Fact]
-        public async Task GetByNameAsync_ShouldReturnExercise_WhenExerciseExists()
-        {
-            // Arrange
-            var exercise = new Exercise { Name = "Squat", Type = "Strength" };
-            _context.Exercises.Add(exercise);
-            await _context.SaveChangesAsync();
-
-            // Act
-            var result = await _exerciseRepository.GetByNameAsync("Squat");
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Squat", result.Name);
-            Assert.Equal("Strength", result.Type);
-        }
-
-        [Fact]
-        public async Task GetByNameAsync_ShouldReturnNull_WhenExerciseDoesNotExist()
-        {
-            // Act
-            var result = await _exerciseRepository.GetByNameAsync("NonExistentExercise");
-
-            // Assert
-            Assert.Null(result);
-        }
-
-        [Fact]
-        public async Task GetAllExercisesAsync_ShouldReturnAllExercises()
-        {
-            // Arrange
-            var exercises = new List<Exercise>
-            {
-                new Exercise { Name = "Push Up", Type = "Strength" },
-                new Exercise { Name = "Pull Up", Type = "Strength" },
-                new Exercise { Name = "Squat", Type = "Strength" }
-            };
-            _context.Exercises.AddRange(exercises);
-            await _context.SaveChangesAsync();
-
-            // Act
-            var result = await _exerciseRepository.GetAllExercisesAsync();
-
-            // Assert
-            Assert.Equal(3, result.Count());
-            Assert.Contains(result, e => e.Name == "Push Up");
-            Assert.Contains(result, e => e.Name == "Pull Up");
-            Assert.Contains(result, e => e.Name == "Squat");
-        }
+        // Assert
+        Assert.Equal(2, result.Count());
+        Assert.Contains(result, e => e.Name == "Exercise 1");
+        Assert.Contains(result, e => e.Name == "Exercise 2");
     }
 }
