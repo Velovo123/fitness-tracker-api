@@ -5,7 +5,6 @@ using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
-using WorkoutFitnessTrackerAPI.Helpers;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
@@ -26,6 +25,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories
         {
             var plansQuery = _context.WorkoutPlans
                 .Where(wp => wp.UserId == userId)
+                .AsNoTracking()
                 .Include(wp => wp.WorkoutPlanExercises)
                 .ThenInclude(wpe => wpe.Exercise)
                 .AsQueryable();
@@ -40,45 +40,55 @@ namespace WorkoutFitnessTrackerAPI.Repositories
 
         public async Task<WorkoutPlanDto?> GetWorkoutPlanByNameAsync(Guid userId, string planName)
         {
-            var normalizedPlanName = NameNormalizationHelper.NormalizeName(planName);
-            var plan = await FindWorkoutPlanByName(userId, normalizedPlanName);
+            var plan = await FindWorkoutPlanByNameAsync(userId, planName);
             return plan == null ? null : _mapper.Map<WorkoutPlanDto>(plan);
         }
 
-        public async Task<bool> SaveWorkoutPlanAsync(Guid userId, WorkoutPlanDto workoutPlanDto, bool overwrite = false)
+        public async Task<bool> CreateWorkoutPlanAsync(Guid userId, WorkoutPlanDto workoutPlanDto)
         {
-            if (workoutPlanDto == null) throw new ArgumentNullException(nameof(workoutPlanDto));
-            if (string.IsNullOrWhiteSpace(workoutPlanDto.Name)) throw new ArgumentException("Workout plan name cannot be null or empty.", nameof(workoutPlanDto.Name));
-            if (workoutPlanDto.Exercises == null || !workoutPlanDto.Exercises.Any()) throw new ArgumentException("At least one exercise is required.", nameof(workoutPlanDto.Exercises));
-            var normalizedPlanName = NameNormalizationHelper.NormalizeName(workoutPlanDto.Name);
-            var existingPlan = await FindWorkoutPlanByName(userId, normalizedPlanName);
+            var exercisesInPlan = await _exerciseService.PrepareExercises<WorkoutPlanExercise>(userId, workoutPlanDto.Exercises);
+
+            var workoutPlan = new WorkoutPlan
+            {
+                UserId = userId,
+                Name = workoutPlanDto.Name,
+                Goal = workoutPlanDto.Goal,
+                WorkoutPlanExercises = exercisesInPlan
+            };
+
+            _context.WorkoutPlans.Add(workoutPlan);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task<bool> UpdateWorkoutPlanAsync(Guid userId, WorkoutPlanDto workoutPlanDto)
+        {
+            var existingPlan = await FindWorkoutPlanByNameAsync(userId, workoutPlanDto.Name);
+            if (existingPlan == null) return false;
 
             var exercisesInPlan = await _exerciseService.PrepareExercises<WorkoutPlanExercise>(userId, workoutPlanDto.Exercises);
 
-            if (existingPlan != null)
-            {
-                if (!overwrite)
-                {
-                    throw new InvalidOperationException("A workout plan with this name already exists. Confirm overwrite.");
-                }
-                UpdateExistingWorkoutPlan(existingPlan, workoutPlanDto.Goal, exercisesInPlan);
-            }
-            else
-            {
-                CreateNewWorkoutPlan(userId, normalizedPlanName, workoutPlanDto.Goal, exercisesInPlan);
-            }
+            existingPlan.Goal = workoutPlanDto.Goal;
+            _context.WorkoutPlanExercises.RemoveRange(existingPlan.WorkoutPlanExercises);
+            existingPlan.WorkoutPlanExercises = exercisesInPlan;
 
             return await _context.SaveChangesAsync() > 0;
         }
 
         public async Task<bool> DeleteWorkoutPlanAsync(Guid userId, string planName)
         {
-            var normalizedPlanName = NameNormalizationHelper.NormalizeName(planName);
-            var plan = await FindWorkoutPlanByName(userId, normalizedPlanName);
+            var plan = await FindWorkoutPlanByNameAsync(userId, planName);
             if (plan == null) return false;
 
             _context.WorkoutPlans.Remove(plan);
             return await _context.SaveChangesAsync() > 0;
+        }
+
+        private async Task<WorkoutPlan?> FindWorkoutPlanByNameAsync(Guid userId, string planName)
+        {
+            return await _context.WorkoutPlans
+                .Include(wp => wp.WorkoutPlanExercises)
+                .ThenInclude(wpe => wpe.Exercise)
+                .FirstOrDefaultAsync(wp => wp.UserId == userId && wp.Name == planName);
         }
 
         private IQueryable<WorkoutPlan> ApplyFilters(IQueryable<WorkoutPlan> query, WorkoutPlanQueryParams queryParams)
@@ -102,33 +112,6 @@ namespace WorkoutFitnessTrackerAPI.Repositories
         {
             return query.Skip(((queryParams.PageNumber ?? 1) - 1) * (queryParams.PageSize ?? 10))
                         .Take(queryParams.PageSize ?? 10);
-        }
-
-        private async Task<WorkoutPlan?> FindWorkoutPlanByName(Guid userId, string normalizedPlanName)
-        {
-            return await _context.WorkoutPlans
-                .Include(wp => wp.WorkoutPlanExercises)
-                .ThenInclude(wpe => wpe.Exercise)
-                .FirstOrDefaultAsync(wp => wp.UserId == userId && wp.Name == normalizedPlanName);
-        }
-
-        private void UpdateExistingWorkoutPlan(WorkoutPlan plan, string? goal, List<WorkoutPlanExercise> exercisesInPlan)
-        {
-            plan.Goal = goal!;
-            _context.WorkoutPlanExercises.RemoveRange(plan.WorkoutPlanExercises);
-            plan.WorkoutPlanExercises = exercisesInPlan;
-        }
-
-        private void CreateNewWorkoutPlan(Guid userId, string normalizedName, string? goal, List<WorkoutPlanExercise> exercisesInPlan)
-        {
-            var workoutPlan = new WorkoutPlan
-            {
-                UserId = userId,
-                Name = normalizedName,
-                Goal = goal!,
-                WorkoutPlanExercises = exercisesInPlan
-            };
-            _context.WorkoutPlans.Add(workoutPlan);
         }
     }
 }
