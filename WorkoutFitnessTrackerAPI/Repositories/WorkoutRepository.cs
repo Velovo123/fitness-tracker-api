@@ -1,9 +1,12 @@
-﻿using WorkoutFitnessTrackerAPI.Models;
-using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
-using WorkoutFitnessTrackerAPI.Data;
-using WorkoutFitnessTrackerAPI.Services.IServices;
-using Microsoft.EntityFrameworkCore;
+﻿using WorkoutFitnessTrackerAPI.Data;
+using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
+using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace WorkoutFitnessTrackerAPI.Repositories
 {
@@ -32,13 +35,13 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             return await workoutsQuery.ToListAsync();
         }
 
-        public async Task<IEnumerable<Workout>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
+        public async Task<IEnumerable<Workout>> GetWorkoutsByDateTimeAsync(Guid userId, DateTime dateTime)
         {
             return await _context.Workouts
                 .AsNoTracking()
-                .Where(w => w.UserId == userId && w.Date.Date == date.Date)
+                .Where(w => w.UserId == userId && w.Date == dateTime)
                 .Include(w => w.WorkoutExercises)
-                    .ThenInclude(we => we.Exercise)
+                .ThenInclude(we => we.Exercise)
                 .ToListAsync();
         }
 

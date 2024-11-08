@@ -3,17 +3,27 @@ using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using AutoMapper;
 using WorkoutFitnessTrackerAPI.Models;
+using WorkoutFitnessTrackerAPI.Services.IServices;
+using WorkoutFitnessTracker.API.Models.Dto_s.Exercise;
+using WorkoutFitnessTrackerAPI.Helpers;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System;
+using System.Linq;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
     public class WorkoutService : IWorkoutService
     {
         private readonly IWorkoutRepository _workoutRepository;
+        private readonly IExerciseService _exerciseService;
         private readonly IMapper _mapper;
 
-        public WorkoutService(IWorkoutRepository workoutRepository, IMapper mapper)
+        public WorkoutService(IWorkoutRepository workoutRepository, IExerciseService exerciseService, IMapper mapper)
         {
             _workoutRepository = workoutRepository;
+            _exerciseService = exerciseService;
             _mapper = mapper;
         }
 
@@ -25,16 +35,16 @@ namespace WorkoutFitnessTrackerAPI.Services
 
         public async Task<IEnumerable<WorkoutDto>> GetWorkoutsByDateAsync(Guid userId, DateTime date)
         {
-            var workouts = await _workoutRepository.GetWorkoutsByDateAsync(userId, date);
+            var workouts = await _workoutRepository.GetWorkoutsByDateTimeAsync(userId, date);
             return _mapper.Map<IEnumerable<WorkoutDto>>(workouts);
         }
 
         public async Task<bool> CreateWorkoutAsync(Guid userId, WorkoutDto workoutDto, bool overwrite = false)
         {
-            var existingWorkouts = await _workoutRepository.GetWorkoutsByDateAsync(userId, workoutDto.Date);
+            var existingWorkouts = await _workoutRepository.GetWorkoutsByDateTimeAsync(userId, workoutDto.Date);
             if (existingWorkouts.Any() && !overwrite)
             {
-                throw new InvalidOperationException("Workout already exists for the specified date. Enable overwrite to update.");
+                throw new InvalidOperationException("Workout already exists for the specified date and time. Enable overwrite to update.");
             }
             else if (existingWorkouts.Any() && overwrite)
             {
@@ -43,15 +53,37 @@ namespace WorkoutFitnessTrackerAPI.Services
 
             var workout = _mapper.Map<Workout>(workoutDto);
             workout.UserId = userId;
+
+            // Prepare and deduplicate exercises
+            var workoutExercises = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
+            workout.WorkoutExercises = workoutExercises;
+
             return await _workoutRepository.CreateWorkoutAsync(workout);
         }
 
         public async Task<bool> UpdateWorkoutAsync(Guid userId, WorkoutDto workoutDto)
         {
-            var workout = _mapper.Map<Workout>(workoutDto);
-            workout.UserId = userId;
-            return await _workoutRepository.UpdateWorkoutAsync(workout);
+            // Delete the existing workout for the specified user and date
+            var deleteSuccess = await _workoutRepository.DeleteWorkoutAsync(userId, workoutDto.Date);
+            if (!deleteSuccess)
+            {
+                // Workout not found or failed to delete
+                return false;
+            }
+
+            // Create a new workout instance with the updated details
+            var newWorkout = _mapper.Map<Workout>(workoutDto);
+            newWorkout.UserId = userId;
+
+            // Prepare and add exercises as new entries
+            var workoutExercises = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
+            newWorkout.WorkoutExercises = workoutExercises;
+
+            // Save the new workout to the database
+            return await _workoutRepository.CreateWorkoutAsync(newWorkout);
         }
+
+
 
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
         {

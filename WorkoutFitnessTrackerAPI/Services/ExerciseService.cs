@@ -2,12 +2,12 @@
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Models.Dto_s.IDto_s;
-using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
-using WorkoutFitnessTrackerAPI.Services.IServices;
 using WorkoutFitnessTrackerAPI.Helpers;
+using WorkoutFitnessTrackerAPI.Services.IServices;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using WorkoutFitnessTracker.API.Models.Dto_s.Exercise;
 
@@ -16,17 +16,15 @@ namespace WorkoutFitnessTrackerAPI.Services
     public class ExerciseService : IExerciseService
     {
         private readonly WFTDbContext _context;
-        private readonly IExerciseRepository _exerciseRepository;
 
-        public ExerciseService(WFTDbContext context, IExerciseRepository exerciseRepository)
+        public ExerciseService(WFTDbContext context)
         {
             _context = context;
-            _exerciseRepository = exerciseRepository;
         }
 
-        public Task<string> NormalizeExerciseNameAsync(string exerciseName)
+        public async Task<string> NormalizeExerciseNameAsync(string exerciseName)
         {
-            return Task.FromResult(NameNormalizationHelper.NormalizeName(exerciseName));
+            return await Task.FromResult(NameNormalizationHelper.NormalizeName(exerciseName));
         }
 
         public async Task<List<T>> PrepareExercises<T>(Guid userId, IEnumerable<IExerciseDto> exercises) where T : class, new()
@@ -35,7 +33,7 @@ namespace WorkoutFitnessTrackerAPI.Services
 
             foreach (var exerciseDto in exercises)
             {
-                var standardizedExerciseName = NameNormalizationHelper.NormalizeName(exerciseDto.ExerciseName);
+                var standardizedExerciseName = await NormalizeExerciseNameAsync(exerciseDto.ExerciseName);
                 var exercise = await GetOrCreateExerciseAsync(standardizedExerciseName, exerciseDto);
 
                 await EnsureUserExerciseLinkAsync(userId, exercise.Id);
@@ -43,7 +41,14 @@ namespace WorkoutFitnessTrackerAPI.Services
                 var preparedExercise = CreateExerciseInstance<T>(exercise.Id, exerciseDto);
                 if (preparedExercise != null)
                 {
-                    preparedExercises.Add(preparedExercise);
+                    bool isDuplicate = preparedExercises.Any(e =>
+                        e is WorkoutExercise we && we.ExerciseId == exercise.Id && we.Sets == exerciseDto.Sets && we.Reps == exerciseDto.Reps ||
+                        e is WorkoutPlanExercise wpe && wpe.ExerciseId == exercise.Id && wpe.Sets == exerciseDto.Sets && wpe.Reps == exerciseDto.Reps);
+
+                    if (!isDuplicate)
+                    {
+                        preparedExercises.Add(preparedExercise);
+                    }
                 }
             }
 
@@ -53,8 +58,7 @@ namespace WorkoutFitnessTrackerAPI.Services
         public async Task<Exercise> GetExerciseByNormalizedNameAsync(string exerciseName)
         {
             var normalizedExerciseName = NameNormalizationHelper.NormalizeName(exerciseName);
-            return await _exerciseRepository.GetByNameAsync(normalizedExerciseName)
-                   ?? await _context.Exercises.FirstOrDefaultAsync(ex => ex.Name == normalizedExerciseName);
+            return await _context.Exercises.FirstOrDefaultAsync(ex => ex.Name == normalizedExerciseName);
         }
 
         public async Task<bool> EnsureUserExerciseLinkAsync(Guid userId, Guid exerciseId)
@@ -77,9 +81,28 @@ namespace WorkoutFitnessTrackerAPI.Services
             return false;
         }
 
+        public async Task<IEnumerable<Exercise>> GetAllExercisesAsync()
+        {
+            return await _context.Exercises.AsNoTracking().ToListAsync();
+        }
+
+        public async Task<Exercise> AddExerciseAsync(ExerciseDto exerciseDto)
+        {
+            var normalizedExerciseName = await NormalizeExerciseNameAsync(exerciseDto.Name);
+            var exercise = new Exercise
+            {
+                Id = Guid.NewGuid(),
+                Name = normalizedExerciseName,
+                Type = exerciseDto.Type
+            };
+            _context.Exercises.Add(exercise);
+            await _context.SaveChangesAsync();
+            return exercise;
+        }
+
         private async Task<Exercise> GetOrCreateExerciseAsync(string standardizedExerciseName, IExerciseDto exerciseDto)
         {
-            var exercise = await _exerciseRepository.GetByNameAsync(standardizedExerciseName);
+            var exercise = await _context.Exercises.FirstOrDefaultAsync(ex => ex.Name == standardizedExerciseName);
             if (exercise == null)
             {
                 exercise = new Exercise
@@ -88,9 +111,10 @@ namespace WorkoutFitnessTrackerAPI.Services
                     Name = standardizedExerciseName,
                     Type = (exerciseDto as WorkoutExerciseDto)?.Type
                 };
-                await _exerciseRepository.AddAsync(exercise);
-            }
 
+                _context.Exercises.Add(exercise);
+                await _context.SaveChangesAsync();
+            }
             return exercise;
         }
 
@@ -114,25 +138,7 @@ namespace WorkoutFitnessTrackerAPI.Services
                     Reps = exerciseDto.Reps
                 };
             }
-
             return null;
-        }
-
-        public async Task<IEnumerable<Exercise>> GetAllExercisesAsync()
-        {
-            return await _exerciseRepository.GetAllExercisesAsync();
-        }
-
-        public async Task<Exercise> AddExerciseAsync(ExerciseDto exerciseDto)
-        {
-            var normalizedExerciseName = NameNormalizationHelper.NormalizeName(exerciseDto.Name);
-            var exercise = new Exercise
-            {
-                Id = Guid.NewGuid(),
-                Name = normalizedExerciseName,
-                Type = exerciseDto.Type
-            };
-            return await _exerciseRepository.AddAsync(exercise);
         }
     }
 }
