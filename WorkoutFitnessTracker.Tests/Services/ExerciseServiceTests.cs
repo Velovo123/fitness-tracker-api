@@ -10,7 +10,6 @@ using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Models.Dto_s.IDto_s;
-using WorkoutFitnessTrackerAPI.Repositories;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using WorkoutFitnessTrackerAPI.Services;
 using Xunit;
@@ -28,27 +27,23 @@ public class ExerciseServiceTests
             .Options;
         _dbContext = new WFTDbContext(options);
         _exerciseRepositoryMock = new Mock<IExerciseRepository>();
-        _service = new ExerciseService(_dbContext, _exerciseRepositoryMock.Object);
+        _service = new ExerciseService(_dbContext);
     }
 
     [Fact]
     public void NormalizeExerciseNameAsync_ShouldReturnNormalizedName()
     {
-        // Arrange
         var exerciseName = " Bench Press ";
         var expectedNormalizedName = NameNormalizationHelper.NormalizeName(exerciseName);
 
-        // Act
         var result = _service.NormalizeExerciseNameAsync(exerciseName).Result;
 
-        // Assert
         Assert.Equal(expectedNormalizedName, result);
     }
 
     [Fact]
     public async Task PrepareExercises_ShouldPrepareExercises_WhenExercisesAreValid()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var exercises = new List<IExerciseDto>
         {
@@ -56,103 +51,89 @@ public class ExerciseServiceTests
             new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 8 }
         };
 
-        // Act
         var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
 
-        // Assert
         Assert.Equal(2, result.Count);
     }
 
     [Fact]
-    public async Task GetExerciseByNormalizedNameAsync_ShouldReturnExercise_WhenExerciseExists()
+    public async Task PrepareExercises_ShouldRemoveDuplicateExercises_WhenExercisesHaveSameNameSetsAndReps()
     {
-        // Arrange
-        var exerciseName = "Bench Press";
-        var normalizedExerciseName = NameNormalizationHelper.NormalizeName(exerciseName);
-        var exercise = new Exercise { Id = Guid.NewGuid(), Name = normalizedExerciseName };
-
-        _exerciseRepositoryMock.Setup(r => r.GetByNameAsync(normalizedExerciseName))
-            .ReturnsAsync(exercise);
-
-        // Act
-        var result = await _service.GetExerciseByNormalizedNameAsync(exerciseName);
-
-        // Assert
-        Assert.Equal(exercise.Id, result.Id);
-        Assert.Equal(exercise.Name, result.Name);
-    }
-
-    [Fact]
-    public async Task EnsureUserExerciseLinkAsync_ShouldReturnTrue_WhenLinkDoesNotExist()
-    {
-        // Arrange
         var userId = Guid.NewGuid();
-        var exerciseId = Guid.NewGuid();
+        var exercises = new List<IExerciseDto>
+        {
+            new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 3, Reps = 10 },
+            new WorkoutExerciseDto { ExerciseName = "squat", Sets = 3, Reps = 10 },
+            new WorkoutExerciseDto { ExerciseName = "Bench Press", Sets = 4, Reps = 8 }
+        };
 
-        // Act
-        var result = await _service.EnsureUserExerciseLinkAsync(userId, exerciseId);
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetByNameAsync(It.IsAny<string>()))
+            .ReturnsAsync((string name) => new Exercise { Id = Guid.NewGuid(), Name = name });
 
-        // Assert
-        Assert.True(result);
-        Assert.Single(_dbContext.UserExercises.Where(ue => ue.UserId == userId && ue.ExerciseId == exerciseId));
+        var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
+
+        Assert.Equal(2, result.Count);
     }
 
     [Fact]
-    public async Task EnsureUserExerciseLinkAsync_ShouldReturnFalse_WhenLinkExists()
+    public async Task PrepareExercises_ShouldAllowSameExerciseWithDifferentSetsOrReps()
     {
-        // Arrange
         var userId = Guid.NewGuid();
-        var exerciseId = Guid.NewGuid();
+        var exercises = new List<IExerciseDto>
+        {
+            new WorkoutExerciseDto { ExerciseName = "Push-up", Sets = 3, Reps = 15 },
+            new WorkoutExerciseDto { ExerciseName = "pushup", Sets = 4, Reps = 15 },
+            new WorkoutExerciseDto { ExerciseName = "pushup", Sets = 3, Reps = 10 }
+        };
 
-        _dbContext.UserExercises.Add(new UserExercise { UserId = userId, ExerciseId = exerciseId });
-        await _dbContext.SaveChangesAsync();
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetByNameAsync(It.IsAny<string>()))
+            .ReturnsAsync((string name) => new Exercise { Id = Guid.NewGuid(), Name = name });
 
-        // Act
-        var result = await _service.EnsureUserExerciseLinkAsync(userId, exerciseId);
+        var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
 
-        // Assert
-        Assert.False(result);
-        Assert.Single(_dbContext.UserExercises.Where(ue => ue.UserId == userId && ue.ExerciseId == exerciseId));
+        Assert.Equal(3, result.Count);
     }
 
     [Fact]
-    public async Task GetAllExercisesAsync_ShouldReturnAllExercises()
+    public async Task PrepareExercises_ShouldNormalizeExerciseNames_WhenNamesAreInconsistent()
     {
-        // Arrange
-        var exercises = new List<Exercise>
+        var userId = Guid.NewGuid();
+        var exercises = new List<IExerciseDto>
         {
-            new Exercise { Id = Guid.NewGuid(), Name = "Bench Press", Type = "Strength" },
-            new Exercise { Id = Guid.NewGuid(), Name = "Squat", Type = "Strength" }
+            new WorkoutExerciseDto { ExerciseName = "Bench Press", Sets = 3, Reps = 10 },
+            new WorkoutExerciseDto { ExerciseName = "bench press", Sets = 3, Reps = 10 }
         };
-        _exerciseRepositoryMock.Setup(r => r.GetAllExercisesAsync()).ReturnsAsync(exercises);
 
-        // Act
-        var result = await _service.GetAllExercisesAsync();
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetByNameAsync(It.IsAny<string>()))
+            .ReturnsAsync((string name) => new Exercise { Id = Guid.NewGuid(), Name = name });
 
-        // Assert
-        Assert.Equal(2, result.Count());
+        var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
+
+        Assert.Single(result);
     }
 
     [Fact]
-    public async Task AddExerciseAsync_ShouldAddExercise_WhenExerciseIsValid()
+    public async Task PrepareExercises_ShouldLinkUserToEachUniqueExercise()
     {
-        // Arrange
-        var exerciseDto = new ExerciseDto { Name = "Deadlift", Type = "Strength" };
-        var normalizedExerciseName = NameNormalizationHelper.NormalizeName(exerciseDto.Name);
-
-        var exercise = new Exercise
+        var userId = Guid.NewGuid();
+        var exercises = new List<IExerciseDto>
         {
-            Id = Guid.NewGuid(),
-            Name = normalizedExerciseName,
-            Type = exerciseDto.Type
+            new WorkoutExerciseDto { ExerciseName = "Pull-up", Sets = 3, Reps = 10 },
+            new WorkoutExerciseDto { ExerciseName = "Pull-up", Sets = 4, Reps = 8 }
         };
-        _exerciseRepositoryMock.Setup(r => r.AddAsync(It.IsAny<Exercise>())).ReturnsAsync(exercise);
 
-        // Act
-        var result = await _service.AddExerciseAsync(exerciseDto);
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetByNameAsync(It.IsAny<string>()))
+            .ReturnsAsync((string name) => new Exercise { Id = Guid.NewGuid(), Name = name });
 
-        // Assert
-        Assert.Equal(normalizedExerciseName, result.Name);
-        Assert.Equal(exerciseDto.Type, result.Type);
+        var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
+
+        foreach (var exercise in result)
+        {
+            Assert.Contains(_dbContext.UserExercises, ue => ue.UserId == userId && ue.ExerciseId == ((WorkoutExercise)exercise).ExerciseId);
+        }
     }
 }

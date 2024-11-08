@@ -10,10 +10,8 @@ namespace WorkoutFitnessTrackerAPI.Mappings
         {
             CreateMap<Workout, WorkoutDto>()
                 .ForMember(dest => dest.Exercises, opt => opt.MapFrom(src => src.WorkoutExercises))
-                .ReverseMap()
-                .ForMember(dest => dest.WorkoutExercises, opt => opt.Ignore()); // Avoid recursive mapping issues
+                .ReverseMap();
 
-            // Bidirectional mapping between WorkoutExercise and WorkoutExerciseDto
             CreateMap<WorkoutExercise, WorkoutExerciseDto>()
                 .ForMember(dest => dest.ExerciseName, opt => opt.MapFrom(src => src.Exercise.Name))
                 .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Exercise.Type ?? "Unknown"))
