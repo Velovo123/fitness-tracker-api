@@ -4,13 +4,10 @@ using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using AutoMapper;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Services.IServices;
-using WorkoutFitnessTracker.API.Models.Dto_s.Exercise;
-using WorkoutFitnessTrackerAPI.Helpers;
-using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
@@ -67,7 +64,6 @@ namespace WorkoutFitnessTrackerAPI.Services
             var deleteSuccess = await _workoutRepository.DeleteWorkoutAsync(userId, workoutDto.Date);
             if (!deleteSuccess)
             {
-                // Workout not found or failed to delete
                 return false;
             }
 
@@ -79,11 +75,8 @@ namespace WorkoutFitnessTrackerAPI.Services
             var workoutExercises = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
             newWorkout.WorkoutExercises = workoutExercises;
 
-            // Save the new workout to the database
             return await _workoutRepository.CreateWorkoutAsync(newWorkout);
         }
-
-
 
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
         {
