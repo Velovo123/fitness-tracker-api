@@ -14,6 +14,7 @@ using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Middleware;
 using WorkoutFitnessTracker.API.Services.IServices;
 using WorkoutFitnessTracker.API.Services;
+using Microsoft.AspNetCore.WebSockets;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -99,6 +100,7 @@ builder.Services.AddScoped<IWorkoutService, WorkoutService>();
 builder.Services.AddScoped<IWorkoutPlanRepository, WorkoutPlanRepository>();
 builder.Services.AddScoped<IWorkoutPlanService, WorkoutPlanService>();
 builder.Services.AddScoped<IProgressRecordRepository, ProgressRecordRepository>();
+builder.Services.AddScoped<IProgressRecordService, ProgressRecordService>();
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 var app = builder.Build();
