@@ -61,6 +61,24 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             return await _context.SaveChangesAsync() > 0;
         }
 
+        public async Task<List<ProgressRecord>> GetProgressRecordsByDateRangeAsync(Guid userId, Guid exerciseId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            var query = _context.ProgressRecords
+                .Where(pr => pr.UserId == userId && pr.ExerciseId == exerciseId);
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(pr => pr.Date >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                query = query.Where(pr => pr.Date <= endDate.Value);
+            }
+
+            return await query.OrderBy(pr => pr.Date).AsNoTracking().ToListAsync();
+        }
+
         private IQueryable<ProgressRecord> ApplyFilters(IQueryable<ProgressRecord> query, ProgressRecordQueryParams queryParams)
         {
             if (queryParams.StartDate.HasValue)
