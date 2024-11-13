@@ -179,4 +179,68 @@ public class InsightsControllerTests
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.GetExerciseProgressTrend(exerciseName, null, null));
     }
+
+    [Fact]
+    public async Task GetWeeklyMonthlySummary_ReturnsOk_WhenWorkoutsExist()
+    {
+        // Arrange
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+        var summaryDto = new WeeklyMonthlySummaryDto
+        {
+            TotalWorkouts = 5,
+            AverageDuration = 45,
+            TotalReps = 200,
+            TotalSets = 50,
+            StartDate = startDate,
+            EndDate = endDate
+        };
+
+        _workoutServiceMock
+            .Setup(s => s.GetWeeklyMonthlySummaryAsync(It.IsAny<Guid>(), startDate, endDate))
+            .ReturnsAsync(summaryDto);
+
+        // Act
+        var result = await _controller.GetWeeklyMonthlySummary(startDate, endDate);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<WeeklyMonthlySummaryDto>>(okResult.Value);
+        Assert.True(response.Success);
+        Assert.Equal("Weekly/Monthly summary retrieved successfully.", response.Message);
+        Assert.Equal(summaryDto, response.Data);
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlySummary_ThrowsInvalidOperationException_WhenNoWorkoutsFound()
+    {
+        // Arrange
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+
+        _workoutServiceMock
+            .Setup(s => s.GetWeeklyMonthlySummaryAsync(It.IsAny<Guid>(), startDate, endDate))
+            .ThrowsAsync(new InvalidOperationException("No workouts found for the specified date range."));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.GetWeeklyMonthlySummary(startDate, endDate));
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlySummary_ReturnsBadRequest_WhenModelStateIsInvalid()
+    {
+        // Arrange
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+
+        // Simulate invalid model state (e.g., missing required date range parameters)
+        _controller.ModelState.AddModelError("startDate", "The startDate field is required.");
+
+        // Act
+        var result = await _controller.GetWeeklyMonthlySummary(startDate, endDate);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+    }
 }
