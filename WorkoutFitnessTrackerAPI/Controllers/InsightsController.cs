@@ -78,5 +78,23 @@ namespace WorkoutFitnessTracker.API.Controllers
             var result = await _workoutService.GetWeeklyMonthlySummaryAsync(userId, startDate, endDate);
             return WrapResponse(true, result, "Weekly/Monthly summary retrieved successfully.");
         }
+
+        [HttpGet("weekly-monthly-comparison")]
+        public async Task<IActionResult> GetWeeklyMonthlyComparison([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string intervalType)
+        {
+            if (string.IsNullOrWhiteSpace(intervalType) || (intervalType.ToLower() != "weekly" && intervalType.ToLower() != "monthly"))
+            {
+                return BadRequest("Invalid interval type. Please use 'weekly' or 'monthly'.");
+            }
+
+            if (endDate <= startDate)
+            {
+                return BadRequest("End date must be greater than start date.");
+            }
+
+            var userId = GetUserId(); // Retrieve user ID from JWT token
+            var result = await _workoutService.GetWeeklyMonthlyComparisonAsync(userId, startDate, endDate, intervalType);
+            return WrapResponse(true, result, "Weekly/Monthly comparison data retrieved successfully.");
+        }
     }
 }
