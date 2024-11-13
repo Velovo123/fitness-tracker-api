@@ -159,11 +159,11 @@ public class WorkoutServiceTests
         // Arrange
         var userId = Guid.NewGuid();
         var workouts = new List<Workout>
-    {
-        new Workout { UserId = userId, Duration = 30 },
-        new Workout { UserId = userId, Duration = 60 },
-        new Workout { UserId = userId, Duration = 90 }
-    };
+        {
+            new Workout { UserId = userId, Duration = 30 },
+            new Workout { UserId = userId, Duration = 60 },
+            new Workout { UserId = userId, Duration = 90 }
+        };
         _workoutRepositoryMock
             .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(workouts);
@@ -174,6 +174,100 @@ public class WorkoutServiceTests
         // Assert
         Assert.Equal(60, result.AverageWorkoutDuration); // (30 + 60 + 90) / 3
         Assert.Equal(3, result.WorkoutCount);
+    }
+
+    [Fact]
+    public async Task GetMostFrequentExercisesAsync_ReturnsTopExercises_WithCorrectFrequencies()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workouts = new List<Workout>
+        {
+            new Workout
+            {
+                UserId = userId,
+                WorkoutExercises = new List<WorkoutExercise>
+                {
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Bench Press" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Bench Press" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Squat" } },
+                }
+            },
+            new Workout
+            {
+                UserId = userId,
+                WorkoutExercises = new List<WorkoutExercise>
+                {
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Bench Press" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Deadlift" } },
+                }
+            }
+        };
+
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, null, null))
+            .ReturnsAsync(workouts);
+
+        // Act
+        var result = await _workoutService.GetMostFrequentExercisesAsync(userId);
+
+        // Assert
+        Assert.Equal(3, result.Count);
+        Assert.Equal("Bench Press", result[0].ExerciseName);
+        Assert.Equal(3, result[0].Frequency);
+        Assert.Equal("Squat", result[1].ExerciseName);
+        Assert.Equal(1, result[1].Frequency);
+        Assert.Equal("Deadlift", result[2].ExerciseName);
+        Assert.Equal(1, result[2].Frequency);
+    }
+
+    [Fact]
+    public async Task GetMostFrequentExercisesAsync_ReturnsTopFiveExercises_WhenMoreThanFiveExist()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workouts = new List<Workout>
+        {
+            new Workout
+            {
+                UserId = userId,
+                WorkoutExercises = new List<WorkoutExercise>
+                {
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Bench Press" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Squat" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Deadlift" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Pull Up" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Push Up" } },
+                    new WorkoutExercise { Exercise = new Exercise { Name = "Overhead Press" } },
+                }
+            }
+        };
+
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, null, null))
+            .ReturnsAsync(workouts);
+
+        // Act
+        var result = await _workoutService.GetMostFrequentExercisesAsync(userId);
+
+        // Assert
+        Assert.Equal(5, result.Count);
+    }
+
+    [Fact]
+    public async Task GetMostFrequentExercisesAsync_ReturnsEmptyList_WhenNoWorkoutsExist()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, null, null))
+            .ReturnsAsync(new List<Workout>());
+
+        // Act
+        var result = await _workoutService.GetMostFrequentExercisesAsync(userId);
+
+        // Assert
+        Assert.Empty(result);
     }
 
 

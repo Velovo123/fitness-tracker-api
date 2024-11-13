@@ -66,4 +66,51 @@ public class InsightsControllerTests
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.GetAverageWorkoutDuration(null, null));
     }
+
+    [Fact]
+    public async Task GetMostFrequentExercises_ReturnsOk_WithFrequentExercisesData()
+    {
+        // Arrange
+        var mostFrequentExercises = new List<MostFrequentExercisesDto>
+        {
+            new MostFrequentExercisesDto("Bench Press", 10),
+            new MostFrequentExercisesDto("Squat", 8),
+            new MostFrequentExercisesDto("Deadlift", 5)
+        };
+
+        _workoutServiceMock
+            .Setup(s => s.GetMostFrequentExercisesAsync(It.IsAny<Guid>(), null, null))
+            .ReturnsAsync(mostFrequentExercises);
+
+        // Act
+        var result = await _controller.GetMostFrequentExercises(null, null);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<List<MostFrequentExercisesDto>>>(okResult.Value);
+
+        Assert.True(response.Success);
+        Assert.Equal("Most frequent exercises retrieved successfully.", response.Message);
+        Assert.Equal(mostFrequentExercises, response.Data);
+    }
+
+    [Fact]
+    public async Task GetMostFrequentExercises_ReturnsEmptyList_WhenNoExercisesFound()
+    {
+        // Arrange
+        _workoutServiceMock
+            .Setup(s => s.GetMostFrequentExercisesAsync(It.IsAny<Guid>(), null, null))
+            .ReturnsAsync(new List<MostFrequentExercisesDto>());
+
+        // Act
+        var result = await _controller.GetMostFrequentExercises(null, null);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<List<MostFrequentExercisesDto>>>(okResult.Value);
+
+        Assert.True(response.Success);
+        Assert.Equal("Most frequent exercises retrieved successfully.", response.Message);
+        Assert.Empty(response.Data);
+    }
 }

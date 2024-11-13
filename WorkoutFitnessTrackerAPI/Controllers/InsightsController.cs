@@ -24,5 +24,13 @@ namespace WorkoutFitnessTracker.API.Controllers
 
             return WrapResponse(true, result, "Average workout duration calculated successfully.");
         }
+
+        [HttpGet("most-frequent-exercises")]
+        public async Task<IActionResult> GetMostFrequentExercises([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+        {
+            var userId = GetUserId();
+            var result = await _workoutService.GetMostFrequentExercisesAsync(userId, startDate, endDate);
+            return WrapResponse(true, result, "Most frequent exercises retrieved successfully.");
+        }
     }
 }

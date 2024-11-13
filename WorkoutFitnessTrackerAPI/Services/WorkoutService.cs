@@ -96,6 +96,21 @@ namespace WorkoutFitnessTrackerAPI.Services
             };
         }
 
+        public async Task<List<MostFrequentExercisesDto>> GetMostFrequentExercisesAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
+
+            var mostFrequentExercises = workouts
+                .SelectMany(w => w.WorkoutExercises)
+                .GroupBy(we => we.Exercise.Name)
+                .Select(group => new MostFrequentExercisesDto(group.Key, group.Count()))
+                .OrderByDescending(dto => dto.Frequency)
+                .Take(5)
+                .ToList();
+
+            return mostFrequentExercises;
+        }
+
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
         {
             return await _workoutRepository.DeleteWorkoutAsync(userId, date);
