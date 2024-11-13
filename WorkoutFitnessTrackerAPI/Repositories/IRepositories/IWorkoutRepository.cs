@@ -7,6 +7,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
     {
         Task<IEnumerable<Workout>> GetWorkoutsAsync(Guid userId, WorkoutQueryParams queryParams);
         Task<IEnumerable<Workout>> GetWorkoutsByDateTimeAsync(Guid userId, DateTime dateTime);
+        Task<IEnumerable<Workout>> GetWorkoutsByDateRangeAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null);
         Task<bool> CreateWorkoutAsync(Workout workout);
         Task<bool> UpdateWorkoutAsync(Workout workout);
         Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date);

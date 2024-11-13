@@ -120,4 +120,61 @@ public class WorkoutServiceTests
         // Assert
         Assert.Equal(workoutDtos, result);
     }
+
+    [Fact]
+    public async Task CalculateAverageWorkoutDurationAsync_ShouldThrowException_WhenNoWorkoutsFound()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
+            .ReturnsAsync(new List<Workout>());
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _workoutService.CalculateAverageWorkoutDurationAsync(userId));
+    }
+
+    [Fact]
+    public async Task CalculateAverageWorkoutDurationAsync_ShouldReturnSingleWorkoutDuration_WhenOneWorkoutExists()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workouts = new List<Workout> { new Workout { UserId = userId, Duration = 60 } };
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
+            .ReturnsAsync(workouts);
+
+        // Act
+        var result = await _workoutService.CalculateAverageWorkoutDurationAsync(userId);
+
+        // Assert
+        Assert.Equal(60, result.AverageWorkoutDuration);
+        Assert.Equal(1, result.WorkoutCount);
+    }
+
+    [Fact]
+    public async Task CalculateAverageWorkoutDurationAsync_ShouldReturnCorrectAverageDuration_WhenMultipleWorkoutsExist()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workouts = new List<Workout>
+    {
+        new Workout { UserId = userId, Duration = 30 },
+        new Workout { UserId = userId, Duration = 60 },
+        new Workout { UserId = userId, Duration = 90 }
+    };
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
+            .ReturnsAsync(workouts);
+
+        // Act
+        var result = await _workoutService.CalculateAverageWorkoutDurationAsync(userId);
+
+        // Assert
+        Assert.Equal(60, result.AverageWorkoutDuration); // (30 + 60 + 90) / 3
+        Assert.Equal(3, result.WorkoutCount);
+    }
+
+
 }

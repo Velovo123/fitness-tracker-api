@@ -45,6 +45,29 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<Workout>> GetWorkoutsByDateRangeAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            var query = _context.Workouts.AsQueryable();
+
+            query = query.Where(w => w.UserId == userId);
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(w => w.Date >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                query = query.Where(w => w.Date <= endDate.Value);
+            }
+
+            return await query
+                .AsNoTracking()
+                .Include(w => w.WorkoutExercises)
+                .ThenInclude(we => we.Exercise)
+                .ToListAsync();
+        }
+
         public async Task<bool> CreateWorkoutAsync(Workout workout)
         {
             _context.Workouts.Add(workout);

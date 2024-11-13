@@ -94,4 +94,30 @@ public class WorkoutRepositoryTests
         Assert.True(result);
         Assert.Empty(_context.Workouts);
     }
+
+    [Fact]
+    public async Task GetWorkoutsByDateRangeAsync_ShouldReturnWorkoutsWithinDateRange()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var startDate = DateTime.UtcNow.AddDays(-3);
+        var endDate = DateTime.UtcNow.AddDays(-1);
+
+        _context.Workouts.AddRange(new List<Workout>
+    {
+        new Workout { UserId = userId, Date = DateTime.UtcNow.AddDays(-4), Duration = 30 }, // Outside range
+        new Workout { UserId = userId, Date = DateTime.UtcNow.AddDays(-2), Duration = 45 }, // Inside range
+        new Workout { UserId = userId, Date = DateTime.UtcNow, Duration = 60 }               // Outside range
+    });
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(45, result.First().Duration);
+        Assert.Equal(userId, result.First().UserId);
+    }
+
 }

@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using WorkoutFitnessTracker.API.Models.Dto_s.Summary;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
@@ -76,6 +77,23 @@ namespace WorkoutFitnessTrackerAPI.Services
             newWorkout.WorkoutExercises = workoutExercises;
 
             return await _workoutRepository.CreateWorkoutAsync(newWorkout);
+        }
+
+        public async Task<WorkoutStatisticsDto> CalculateAverageWorkoutDurationAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
+
+            if (!workouts.Any())
+            {
+                throw new InvalidOperationException("No workouts found for the specified date range.");
+            }
+
+            double averageDuration = workouts.Average(w => w.Duration);
+            return new WorkoutStatisticsDto
+            {
+                AverageWorkoutDuration = averageDuration,
+                WorkoutCount = workouts.Count()
+            };
         }
 
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
