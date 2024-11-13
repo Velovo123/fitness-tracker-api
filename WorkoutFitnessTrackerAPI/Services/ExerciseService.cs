@@ -75,10 +75,9 @@ namespace WorkoutFitnessTrackerAPI.Services
                 });
 
                 await _context.SaveChangesAsync();
-                return true;
             }
 
-            return false;
+            return true;
         }
 
         public async Task<IEnumerable<Exercise>> GetAllExercisesAsync()

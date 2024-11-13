@@ -5,8 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
-using WorkoutFitnessTracker.API.Services.IServices;
+using WorkoutFitnessTracker.API.Models.Dto_s.Summary;
 using WorkoutFitnessTrackerAPI.Models;
+using WorkoutFitnessTracker.API.Services.IServices;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
@@ -43,11 +44,7 @@ namespace WorkoutFitnessTrackerAPI.Services
                           ?? throw new InvalidOperationException("The specified exercise does not exist.");
 
             // Ensure the user is linked to the exercise
-            var isLinked = await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
-            if (!isLinked)
-            {
-                throw new InvalidOperationException("User is not linked to the specified exercise.");
-            }
+            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
 
             var existingRecord = await _progressRecordRepository.GetProgressRecordByDateAsync(userId, progressRecordDto.Date, normalizedExerciseName);
             if (existingRecord != null)
@@ -74,16 +71,37 @@ namespace WorkoutFitnessTrackerAPI.Services
                           ?? throw new InvalidOperationException("The specified exercise does not exist.");
 
             // Ensure the user is linked to the exercise
-            var isLinked = await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
-            if (!isLinked)
-            {
-                throw new InvalidOperationException("User is not linked to the specified exercise.");
-            }
+            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
 
             var recordToUpdate = _mapper.Map<ProgressRecord>(progressRecordDto);
             recordToUpdate.UserId = userId;
             recordToUpdate.ExerciseId = exercise.Id;
             return await _progressRecordRepository.UpdateProgressRecordAsync(recordToUpdate);
+        }
+
+        public async Task<List<ExerciseProgressTrendDto>> GetExerciseProgressTrendAsync(Guid userId, string exerciseName, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            // Retrieve exercise by normalized name
+            var exercise = await _exerciseService.GetExerciseByNormalizedNameAsync(exerciseName)
+                ?? throw new InvalidOperationException("The specified exercise does not exist.");
+
+            // Ensure the user is linked to the exercise
+            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
+
+            // Retrieve progress records
+            var progressRecords = await _progressRecordRepository.GetProgressRecordsByDateRangeAsync(userId, exercise.Id, startDate, endDate);
+
+            // Map to DTO and order by date
+            var trendData = progressRecords
+                .OrderBy(pr => pr.Date)
+                .Select(pr => new ExerciseProgressTrendDto
+                {
+                    Date = pr.Date,
+                    Progress = pr.Progress
+                })
+                .ToList();
+
+            return trendData;
         }
 
         public async Task<bool> DeleteProgressRecordAsync(Guid userId, DateTime date, string exerciseName)

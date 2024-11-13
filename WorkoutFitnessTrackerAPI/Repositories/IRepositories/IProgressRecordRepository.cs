@@ -10,5 +10,7 @@ namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
         Task<bool> CreateProgressRecordAsync(ProgressRecord progressRecord);
         Task<bool> UpdateProgressRecordAsync(ProgressRecord progressRecord);
         Task<bool> DeleteProgressRecordAsync(Guid userId, DateTime date, string exerciseName);
+
+        Task<List<ProgressRecord>> GetProgressRecordsByDateRangeAsync(Guid userId, Guid exerciseId, DateTime? startDate = null, DateTime? endDate = null);
     }
 }

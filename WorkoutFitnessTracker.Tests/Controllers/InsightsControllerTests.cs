@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using System;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using WorkoutFitnessTracker.API.Controllers;
@@ -15,12 +16,14 @@ using Xunit;
 public class InsightsControllerTests
 {
     private readonly Mock<IWorkoutService> _workoutServiceMock;
+    private readonly Mock<IProgressRecordService> _progressRecordServiceMock;
     private readonly InsightsController _controller;
 
     public InsightsControllerTests()
     {
         _workoutServiceMock = new Mock<IWorkoutService>();
-        _controller = new InsightsController(_workoutServiceMock.Object);
+        _progressRecordServiceMock = new Mock<IProgressRecordService>();
+        _controller = new InsightsController(_workoutServiceMock.Object, _progressRecordServiceMock.Object);
 
         var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
         {
@@ -112,5 +115,68 @@ public class InsightsControllerTests
         Assert.True(response.Success);
         Assert.Equal("Most frequent exercises retrieved successfully.", response.Message);
         Assert.Empty(response.Data);
+    }
+
+    [Fact]
+    public async Task GetExerciseProgressTrend_ReturnsOk_WithTrendData()
+    {
+        // Arrange
+        var exerciseName = "Bench Press";
+        var trendData = new List<ExerciseProgressTrendDto>
+        {
+            new ExerciseProgressTrendDto { Date = DateTime.UtcNow.AddDays(-2), Progress = "Reps: 10" },
+            new ExerciseProgressTrendDto { Date = DateTime.UtcNow.AddDays(-1), Progress = "Reps: 12" }
+        };
+
+        _progressRecordServiceMock
+            .Setup(s => s.GetExerciseProgressTrendAsync(It.IsAny<Guid>(), exerciseName, null, null))
+            .ReturnsAsync(trendData);
+
+        // Act
+        var result = await _controller.GetExerciseProgressTrend(exerciseName, null, null);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<List<ExerciseProgressTrendDto>>>(okResult.Value);
+
+        Assert.True(response.Success);
+        Assert.Equal("Exercise progress trend retrieved successfully.", response.Message);
+        Assert.Equal(trendData, response.Data);
+    }
+
+    [Fact]
+    public async Task GetExerciseProgressTrend_ReturnsEmptyList_WhenNoProgressDataFound()
+    {
+        // Arrange
+        var exerciseName = "Bench Press";
+
+        _progressRecordServiceMock
+            .Setup(s => s.GetExerciseProgressTrendAsync(It.IsAny<Guid>(), exerciseName, null, null))
+            .ReturnsAsync(new List<ExerciseProgressTrendDto>());
+
+        // Act
+        var result = await _controller.GetExerciseProgressTrend(exerciseName, null, null);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<List<ExerciseProgressTrendDto>>>(okResult.Value);
+
+        Assert.True(response.Success);
+        Assert.Equal("Exercise progress trend retrieved successfully.", response.Message);
+        Assert.Empty(response.Data);
+    }
+
+    [Fact]
+    public async Task GetExerciseProgressTrend_ThrowsInvalidOperationException_WhenUserNotLinkedToExercise()
+    {
+        // Arrange
+        var exerciseName = "Bench Press";
+
+        _progressRecordServiceMock
+            .Setup(s => s.GetExerciseProgressTrendAsync(It.IsAny<Guid>(), exerciseName, null, null))
+            .ThrowsAsync(new InvalidOperationException("User is not linked to the specified exercise."));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.GetExerciseProgressTrend(exerciseName, null, null));
     }
 }
