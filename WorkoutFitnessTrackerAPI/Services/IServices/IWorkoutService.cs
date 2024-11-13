@@ -11,5 +11,6 @@ namespace WorkoutFitnessTracker.API.Services.IServices
         Task<bool> UpdateWorkoutAsync(Guid userId, WorkoutDto workoutDto);
         Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date);
         Task<WorkoutStatisticsDto> CalculateAverageWorkoutDurationAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null);
+        Task<List<MostFrequentExercisesDto>> GetMostFrequentExercisesAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null);
     }
 }
