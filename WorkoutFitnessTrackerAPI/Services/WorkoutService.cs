@@ -111,6 +111,33 @@ namespace WorkoutFitnessTrackerAPI.Services
             return mostFrequentExercises;
         }
 
+        public async Task<WeeklyMonthlySummaryDto> GetWeeklyMonthlySummaryAsync(Guid userId, DateTime startDate, DateTime endDate)
+        {
+            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
+
+            if (!workouts.Any())
+            {
+                throw new InvalidOperationException("No workouts found for the specified date range.");
+            }
+
+            int totalWorkouts = workouts.Count();
+            double averageDuration = workouts.Average(w => w.Duration);
+            int totalReps = workouts.Sum(w => w.WorkoutExercises.Sum(we => we.Reps));
+            int totalSets = workouts.Sum(w => w.WorkoutExercises.Sum(we => we.Sets));
+
+            // Return the summary DTO
+            return new WeeklyMonthlySummaryDto
+            {
+                TotalWorkouts = totalWorkouts,
+                AverageDuration = averageDuration,
+                TotalReps = totalReps,
+                TotalSets = totalSets,
+                StartDate = startDate,
+                EndDate = endDate
+            };
+        }
+
+
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
         {
             return await _workoutRepository.DeleteWorkoutAsync(userId, date);

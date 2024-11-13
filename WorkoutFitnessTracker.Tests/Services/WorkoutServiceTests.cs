@@ -270,5 +270,65 @@ public class WorkoutServiceTests
         Assert.Empty(result);
     }
 
+    [Fact]
+    public async Task GetWeeklyMonthlySummaryAsync_ShouldThrowException_WhenNoWorkoutsFound()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+
+        _workoutRepositoryMock.Setup(r => r.GetWorkoutsByDateRangeAsync(userId, startDate, endDate))
+                              .ReturnsAsync(new List<Workout>());
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _workoutService.GetWeeklyMonthlySummaryAsync(userId, startDate, endDate));
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlySummaryAsync_ShouldReturnCorrectSummary_WhenWorkoutsExist()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+
+        var workouts = new List<Workout>
+        {
+            new Workout
+            {
+                Duration = 60,
+                WorkoutExercises = new List<WorkoutExercise>
+                {
+                    new WorkoutExercise { Reps = 10, Sets = 3 },
+                    new WorkoutExercise { Reps = 8, Sets = 3 }
+                }
+            },
+            new Workout
+            {
+                Duration = 45,
+                WorkoutExercises = new List<WorkoutExercise>
+                {
+                    new WorkoutExercise { Reps = 12, Sets = 4 }
+                }
+            }
+        };
+
+        _workoutRepositoryMock.Setup(r => r.GetWorkoutsByDateRangeAsync(userId, startDate, endDate))
+                              .ReturnsAsync(workouts);
+
+        // Act
+        var result = await _workoutService.GetWeeklyMonthlySummaryAsync(userId, startDate, endDate);
+
+        // Assert
+        Assert.Equal(2, result.TotalWorkouts);
+        Assert.Equal(52.5, result.AverageDuration);
+        Assert.Equal(30, result.TotalReps);
+        Assert.Equal(10, result.TotalSets);
+        Assert.Equal(startDate, result.StartDate);
+        Assert.Equal(endDate, result.EndDate);
+    }
+
 
 }
