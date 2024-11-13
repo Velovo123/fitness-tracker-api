@@ -1,4 +1,5 @@
-﻿using WorkoutFitnessTrackerAPI.Models.Dto_s;
+﻿using WorkoutFitnessTracker.API.Models.Dto_s.Summary;
+using WorkoutFitnessTrackerAPI.Models.Dto_s;
 
 namespace WorkoutFitnessTracker.API.Services.IServices
 {
@@ -9,5 +10,6 @@ namespace WorkoutFitnessTracker.API.Services.IServices
         Task<bool> CreateWorkoutAsync(Guid userId, WorkoutDto workoutDto, bool overwrite = false);
         Task<bool> UpdateWorkoutAsync(Guid userId, WorkoutDto workoutDto);
         Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date);
+        Task<WorkoutStatisticsDto> CalculateAverageWorkoutDurationAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null);
     }
 }
