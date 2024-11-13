@@ -330,5 +330,94 @@ public class WorkoutServiceTests
         Assert.Equal(endDate, result.EndDate);
     }
 
+    [Fact]
+    public async Task GetWeeklyMonthlyComparisonAsync_ShouldThrowException_WhenNoWorkoutsFound()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var startDate = DateTime.UtcNow.AddMonths(-1);
+        var endDate = DateTime.UtcNow;
+
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, startDate, endDate))
+            .ReturnsAsync(new List<Workout>());
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _workoutService.GetWeeklyMonthlyComparisonAsync(userId, startDate, endDate, "weekly"));
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlyComparisonAsync_ShouldReturnWeeklyData_WhenIntervalIsWeekly()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var startDate = DateTime.UtcNow.AddDays(-14);
+        var endDate = DateTime.UtcNow;
+
+        var workouts = new List<Workout>
+        {
+            new Workout { Date = startDate.AddDays(1), Duration = 30, WorkoutExercises = new List<WorkoutExercise> { new WorkoutExercise { Sets = 3, Reps = 10 } } },
+            new Workout { Date = startDate.AddDays(7), Duration = 45, WorkoutExercises = new List<WorkoutExercise> { new WorkoutExercise { Sets = 4, Reps = 12 } } }
+        };
+
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, startDate, endDate))
+            .ReturnsAsync(workouts);
+
+        // Act
+        var result = await _workoutService.GetWeeklyMonthlyComparisonAsync(userId, startDate, endDate, "weekly");
+
+        // Assert
+        Assert.Equal(2, result.Count); // Expect two weekly groups
+        Assert.Equal(30, result[0].AverageDuration);
+        Assert.Equal(45, result[1].AverageDuration);
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlyComparisonAsync_ShouldReturnMonthlyData_WhenIntervalIsMonthly()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var startDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        var workouts = new List<Workout>
+        {
+            new Workout { Date = startDate.AddDays(1), Duration = 30, WorkoutExercises = new List<WorkoutExercise> { new WorkoutExercise { Sets = 3, Reps = 10 } } },
+            new Workout { Date = startDate.AddDays(15), Duration = 45, WorkoutExercises = new List<WorkoutExercise> { new WorkoutExercise { Sets = 4, Reps = 12 } } }
+        };
+
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, startDate, endDate))
+            .ReturnsAsync(workouts);
+
+        // Act
+        var result = await _workoutService.GetWeeklyMonthlyComparisonAsync(userId, startDate, endDate, "monthly");
+
+        // Assert
+        Assert.Single(result); // Expect a single monthly group
+        Assert.Equal(2, result[0].TotalWorkouts);
+        Assert.Equal(37.5, result[0].AverageDuration);
+        Assert.Equal(22, result[0].TotalReps);
+        Assert.Equal(7, result[0].TotalSets);
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlyComparisonAsync_ShouldThrowException_WhenInvalidIntervalType()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var startDate = DateTime.UtcNow.AddMonths(-1);
+        var endDate = DateTime.UtcNow;
+
+        _workoutRepositoryMock
+            .Setup(repo => repo.GetWorkoutsByDateRangeAsync(userId, startDate, endDate))
+            .ReturnsAsync(new List<Workout>());
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _workoutService.GetWeeklyMonthlyComparisonAsync(userId, startDate, endDate, "daily"));
+    }
 
 }

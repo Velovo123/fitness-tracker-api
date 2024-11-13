@@ -243,4 +243,89 @@ public class InsightsControllerTests
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(400, badRequestResult.StatusCode);
     }
+
+    [Fact]
+    public async Task GetWeeklyMonthlyComparison_ReturnsInternalServerError_WhenExceptionIsThrown()
+    {
+        // Arrange
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+        var intervalType = "weekly";
+
+        _workoutServiceMock
+            .Setup(service => service.GetWeeklyMonthlyComparisonAsync(It.IsAny<Guid>(), startDate, endDate, intervalType))
+            .ThrowsAsync(new InvalidOperationException("No workouts found for the specified date range."));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _controller.GetWeeklyMonthlyComparison(startDate, endDate, intervalType));
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlyComparison_ReturnsOkResult_WithValidInput()
+    {
+        // Arrange
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+        var intervalType = "weekly";
+        var comparisonData = new List<PeriodComparisonDto>
+        {
+            new PeriodComparisonDto
+            {
+                PeriodStart = startDate,
+                PeriodEnd = endDate,
+                TotalWorkouts = 5,
+                AverageDuration = 60,
+                TotalReps = 100,
+                TotalSets = 30
+            }
+        };
+
+        _workoutServiceMock
+            .Setup(service => service.GetWeeklyMonthlyComparisonAsync(It.IsAny<Guid>(), startDate, endDate, intervalType))
+            .ReturnsAsync(comparisonData);
+
+        // Act
+        var result = await _controller.GetWeeklyMonthlyComparison(startDate, endDate, intervalType);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<List<PeriodComparisonDto>>>(okResult.Value);
+
+        Assert.True(response.Success);
+        Assert.Equal("Weekly/Monthly comparison data retrieved successfully.", response.Message);
+        Assert.Equal(comparisonData, response.Data);
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlyComparison_ReturnsBadRequest_WhenEndDateIsLessThanOrEqualToStartDate()
+    {
+        // Arrange
+        var startDate = DateTime.UtcNow;
+        var endDate = DateTime.UtcNow.AddDays(-1);
+        var intervalType = "weekly";
+
+        // Act
+        var result = await _controller.GetWeeklyMonthlyComparison(startDate, endDate, intervalType);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("End date must be greater than start date.", badRequestResult.Value);
+    }
+
+    [Fact]
+    public async Task GetWeeklyMonthlyComparison_ReturnsBadRequest_WhenIntervalTypeIsInvalid()
+    {
+        // Arrange
+        var startDate = DateTime.UtcNow.AddDays(-30);
+        var endDate = DateTime.UtcNow;
+        var invalidIntervalType = "daily";
+
+        // Act
+        var result = await _controller.GetWeeklyMonthlyComparison(startDate, endDate, invalidIntervalType);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Invalid interval type. Please use 'weekly' or 'monthly'.", badRequestResult.Value);
+    }
 }

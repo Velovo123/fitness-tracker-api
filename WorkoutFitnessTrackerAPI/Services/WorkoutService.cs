@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WorkoutFitnessTracker.API.Models.Dto_s.Summary;
+using System.Globalization;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
@@ -136,6 +137,49 @@ namespace WorkoutFitnessTrackerAPI.Services
                 EndDate = endDate
             };
         }
+
+        public async Task<List<PeriodComparisonDto>> GetWeeklyMonthlyComparisonAsync(Guid userId, DateTime startDate, DateTime endDate, string intervalType)
+        {
+            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
+
+            if (!workouts.Any())
+            {
+                throw new InvalidOperationException("No workouts found for the specified date range.");
+            }
+
+            IEnumerable<IGrouping<object, Workout>> groupedWorkouts = intervalType.ToLower() switch
+            {
+                "weekly" => workouts.GroupBy(w => new { w.Date.Year, Week = ISOWeek.GetWeekOfYear(w.Date) }),
+                "monthly" => workouts.GroupBy(w => new { w.Date.Year, w.Date.Month }) ,
+                _ => throw new ArgumentException("Invalid interval type. Use 'weekly' or 'monthly'.")
+            };
+
+
+            var comparisonData = new List<PeriodComparisonDto>();
+
+            foreach (var group in groupedWorkouts)
+            {
+                var periodStart = group.Min(w => w.Date);
+                var periodEnd = group.Max(w => w.Date);
+                var totalWorkouts = group.Count();
+                var averageDuration = group.Average(w => w.Duration);
+                var totalReps = group.Sum(w => w.WorkoutExercises.Sum(we => we.Reps));
+                var totalSets = group.Sum(w => w.WorkoutExercises.Sum(we => we.Sets));
+
+                comparisonData.Add(new PeriodComparisonDto
+                {
+                    PeriodStart = periodStart,
+                    PeriodEnd = periodEnd,
+                    TotalWorkouts = totalWorkouts,
+                    AverageDuration = averageDuration,
+                    TotalReps = totalReps,
+                    TotalSets = totalSets
+                });
+            }
+
+            return comparisonData;
+        }
+
 
 
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
