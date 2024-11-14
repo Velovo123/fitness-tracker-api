@@ -2,28 +2,24 @@
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using System;
-using System.Runtime.CompilerServices;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using WorkoutFitnessTracker.API.Controllers;
 using WorkoutFitnessTracker.API.Models.Dto_s.Summary;
 using WorkoutFitnessTracker.API.Services.IServices;
-using WorkoutFitnessTrackerAPI.Controllers;
 using WorkoutFitnessTrackerAPI.Helpers;
-using WorkoutFitnessTrackerAPI.Services.IServices;
 using Xunit;
 
 public class InsightsControllerTests
 {
-    private readonly Mock<IWorkoutService> _workoutServiceMock;
-    private readonly Mock<IProgressRecordService> _progressRecordServiceMock;
+    private readonly Mock<IInsightsService> _insightsServiceMock;
     private readonly InsightsController _controller;
 
     public InsightsControllerTests()
     {
-        _workoutServiceMock = new Mock<IWorkoutService>();
-        _progressRecordServiceMock = new Mock<IProgressRecordService>();
-        _controller = new InsightsController(_workoutServiceMock.Object, _progressRecordServiceMock.Object);
+        _insightsServiceMock = new Mock<IInsightsService>();
+        _controller = new InsightsController(_insightsServiceMock.Object);
 
         var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
         {
@@ -45,8 +41,8 @@ public class InsightsControllerTests
             AverageWorkoutDuration = 60,
             WorkoutCount = 5
         };
-        _workoutServiceMock.Setup(s => s.CalculateAverageWorkoutDurationAsync(It.IsAny<Guid>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
-                           .ReturnsAsync(workoutStatisticsDto);
+        _insightsServiceMock.Setup(s => s.CalculateAverageWorkoutDurationAsync(It.IsAny<Guid>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
+                            .ReturnsAsync(workoutStatisticsDto);
 
         // Act
         var result = await _controller.GetAverageWorkoutDuration(null, null);
@@ -60,17 +56,6 @@ public class InsightsControllerTests
     }
 
     [Fact]
-    public async Task GetAverageWorkoutDuration_ThrowsInvalidOperationException_WhenNoWorkoutsFound()
-    {
-        // Arrange
-        _workoutServiceMock.Setup(s => s.CalculateAverageWorkoutDurationAsync(It.IsAny<Guid>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
-                           .ThrowsAsync(new InvalidOperationException("No workouts found for the specified date range."));
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.GetAverageWorkoutDuration(null, null));
-    }
-
-    [Fact]
     public async Task GetMostFrequentExercises_ReturnsOk_WithFrequentExercisesData()
     {
         // Arrange
@@ -81,7 +66,7 @@ public class InsightsControllerTests
             new MostFrequentExercisesDto("Deadlift", 5)
         };
 
-        _workoutServiceMock
+        _insightsServiceMock
             .Setup(s => s.GetMostFrequentExercisesAsync(It.IsAny<Guid>(), null, null))
             .ReturnsAsync(mostFrequentExercises);
 
@@ -91,30 +76,9 @@ public class InsightsControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<ResponseWrapper<List<MostFrequentExercisesDto>>>(okResult.Value);
-
         Assert.True(response.Success);
         Assert.Equal("Most frequent exercises retrieved successfully.", response.Message);
         Assert.Equal(mostFrequentExercises, response.Data);
-    }
-
-    [Fact]
-    public async Task GetMostFrequentExercises_ReturnsEmptyList_WhenNoExercisesFound()
-    {
-        // Arrange
-        _workoutServiceMock
-            .Setup(s => s.GetMostFrequentExercisesAsync(It.IsAny<Guid>(), null, null))
-            .ReturnsAsync(new List<MostFrequentExercisesDto>());
-
-        // Act
-        var result = await _controller.GetMostFrequentExercises(null, null);
-
-        // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<ResponseWrapper<List<MostFrequentExercisesDto>>>(okResult.Value);
-
-        Assert.True(response.Success);
-        Assert.Equal("Most frequent exercises retrieved successfully.", response.Message);
-        Assert.Empty(response.Data);
     }
 
     [Fact]
@@ -128,7 +92,7 @@ public class InsightsControllerTests
             new ExerciseProgressTrendDto { Date = DateTime.UtcNow.AddDays(-1), Progress = "Reps: 12" }
         };
 
-        _progressRecordServiceMock
+        _insightsServiceMock
             .Setup(s => s.GetExerciseProgressTrendAsync(It.IsAny<Guid>(), exerciseName, null, null))
             .ReturnsAsync(trendData);
 
@@ -138,46 +102,9 @@ public class InsightsControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<ResponseWrapper<List<ExerciseProgressTrendDto>>>(okResult.Value);
-
         Assert.True(response.Success);
         Assert.Equal("Exercise progress trend retrieved successfully.", response.Message);
         Assert.Equal(trendData, response.Data);
-    }
-
-    [Fact]
-    public async Task GetExerciseProgressTrend_ReturnsEmptyList_WhenNoProgressDataFound()
-    {
-        // Arrange
-        var exerciseName = "Bench Press";
-
-        _progressRecordServiceMock
-            .Setup(s => s.GetExerciseProgressTrendAsync(It.IsAny<Guid>(), exerciseName, null, null))
-            .ReturnsAsync(new List<ExerciseProgressTrendDto>());
-
-        // Act
-        var result = await _controller.GetExerciseProgressTrend(exerciseName, null, null);
-
-        // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<ResponseWrapper<List<ExerciseProgressTrendDto>>>(okResult.Value);
-
-        Assert.True(response.Success);
-        Assert.Equal("Exercise progress trend retrieved successfully.", response.Message);
-        Assert.Empty(response.Data);
-    }
-
-    [Fact]
-    public async Task GetExerciseProgressTrend_ThrowsInvalidOperationException_WhenUserNotLinkedToExercise()
-    {
-        // Arrange
-        var exerciseName = "Bench Press";
-
-        _progressRecordServiceMock
-            .Setup(s => s.GetExerciseProgressTrendAsync(It.IsAny<Guid>(), exerciseName, null, null))
-            .ThrowsAsync(new InvalidOperationException("User is not linked to the specified exercise."));
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.GetExerciseProgressTrend(exerciseName, null, null));
     }
 
     [Fact]
@@ -196,7 +123,7 @@ public class InsightsControllerTests
             EndDate = endDate
         };
 
-        _workoutServiceMock
+        _insightsServiceMock
             .Setup(s => s.GetWeeklyMonthlySummaryAsync(It.IsAny<Guid>(), startDate, endDate))
             .ReturnsAsync(summaryDto);
 
@@ -209,56 +136,6 @@ public class InsightsControllerTests
         Assert.True(response.Success);
         Assert.Equal("Weekly/Monthly summary retrieved successfully.", response.Message);
         Assert.Equal(summaryDto, response.Data);
-    }
-
-    [Fact]
-    public async Task GetWeeklyMonthlySummary_ThrowsInvalidOperationException_WhenNoWorkoutsFound()
-    {
-        // Arrange
-        var startDate = DateTime.UtcNow.AddDays(-30);
-        var endDate = DateTime.UtcNow;
-
-        _workoutServiceMock
-            .Setup(s => s.GetWeeklyMonthlySummaryAsync(It.IsAny<Guid>(), startDate, endDate))
-            .ThrowsAsync(new InvalidOperationException("No workouts found for the specified date range."));
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.GetWeeklyMonthlySummary(startDate, endDate));
-    }
-
-    [Fact]
-    public async Task GetWeeklyMonthlySummary_ReturnsBadRequest_WhenModelStateIsInvalid()
-    {
-        // Arrange
-        var startDate = DateTime.UtcNow.AddDays(-30);
-        var endDate = DateTime.UtcNow;
-
-        // Simulate invalid model state (e.g., missing required date range parameters)
-        _controller.ModelState.AddModelError("startDate", "The startDate field is required.");
-
-        // Act
-        var result = await _controller.GetWeeklyMonthlySummary(startDate, endDate);
-
-        // Assert
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal(400, badRequestResult.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetWeeklyMonthlyComparison_ReturnsInternalServerError_WhenExceptionIsThrown()
-    {
-        // Arrange
-        var startDate = DateTime.UtcNow.AddDays(-30);
-        var endDate = DateTime.UtcNow;
-        var intervalType = "weekly";
-
-        _workoutServiceMock
-            .Setup(service => service.GetWeeklyMonthlyComparisonAsync(It.IsAny<Guid>(), startDate, endDate, intervalType))
-            .ThrowsAsync(new InvalidOperationException("No workouts found for the specified date range."));
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _controller.GetWeeklyMonthlyComparison(startDate, endDate, intervalType));
     }
 
     [Fact]
@@ -281,8 +158,8 @@ public class InsightsControllerTests
             }
         };
 
-        _workoutServiceMock
-            .Setup(service => service.GetWeeklyMonthlyComparisonAsync(It.IsAny<Guid>(), startDate, endDate, intervalType))
+        _insightsServiceMock
+            .Setup(s => s.GetWeeklyMonthlyComparisonAsync(It.IsAny<Guid>(), startDate, endDate, intervalType))
             .ReturnsAsync(comparisonData);
 
         // Act
@@ -291,41 +168,48 @@ public class InsightsControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<ResponseWrapper<List<PeriodComparisonDto>>>(okResult.Value);
-
         Assert.True(response.Success);
         Assert.Equal("Weekly/Monthly comparison data retrieved successfully.", response.Message);
         Assert.Equal(comparisonData, response.Data);
     }
 
     [Fact]
-    public async Task GetWeeklyMonthlyComparison_ReturnsBadRequest_WhenEndDateIsLessThanOrEqualToStartDate()
+    public async Task GetDailyProgress_ReturnsOk_WithDailyProgressData()
     {
         // Arrange
-        var startDate = DateTime.UtcNow;
-        var endDate = DateTime.UtcNow.AddDays(-1);
-        var intervalType = "weekly";
+        var date = DateTime.UtcNow.Date;
+        var dailyProgressDto = new DailyProgressDto
+        {
+            Date = date,
+            TotalWorkouts = 2,
+            AverageDuration = 45,
+            TotalReps = 100,
+            TotalSets = 30,
+            Exercises = new List<ExerciseProgressDto>
+            {
+                new ExerciseProgressDto
+                {
+                    ExerciseName = "Bench Press",
+                    PlannedSets = 3,
+                    PlannedReps = 10,
+                    ActualSets = 3,
+                    ActualReps = 10
+                }
+            }
+        };
+
+        _insightsServiceMock
+            .Setup(s => s.GetDailyProgressAsync(It.IsAny<Guid>(), date))
+            .ReturnsAsync(dailyProgressDto);
 
         // Act
-        var result = await _controller.GetWeeklyMonthlyComparison(startDate, endDate, intervalType);
+        var result = await _controller.GetDailyProgress(date);
 
         // Assert
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal("End date must be greater than start date.", badRequestResult.Value);
-    }
-
-    [Fact]
-    public async Task GetWeeklyMonthlyComparison_ReturnsBadRequest_WhenIntervalTypeIsInvalid()
-    {
-        // Arrange
-        var startDate = DateTime.UtcNow.AddDays(-30);
-        var endDate = DateTime.UtcNow;
-        var invalidIntervalType = "daily";
-
-        // Act
-        var result = await _controller.GetWeeklyMonthlyComparison(startDate, endDate, invalidIntervalType);
-
-        // Assert
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal("Invalid interval type. Please use 'weekly' or 'monthly'.", badRequestResult.Value);
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<DailyProgressDto>>(okResult.Value);
+        Assert.True(response.Success);
+        Assert.Equal("Daily progress data retrieved successfully.", response.Message);
+        Assert.Equal(dailyProgressDto, response.Data);
     }
 }

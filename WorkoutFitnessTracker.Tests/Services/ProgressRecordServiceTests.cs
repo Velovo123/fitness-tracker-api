@@ -177,47 +177,4 @@ public class ProgressRecordServiceTests
         Assert.False(result);
         _progressRecordRepositoryMock.Verify(r => r.DeleteProgressRecordAsync(userId, date, normalizedExerciseName), Times.Once);
     }
-    [Fact]
-    public async Task GetExerciseProgressTrendAsync_ShouldReturnTrendData_WhenUserIsLinkedToExercise()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var exerciseName = "Bench Press";
-        var normalizedExerciseName = exerciseName.ToLowerInvariant();
-        var exercise = new Exercise { Id = Guid.NewGuid(), Name = normalizedExerciseName };
-    
-        var progressRecords = new List<ProgressRecord>
-        {
-            new ProgressRecord { Date = DateTime.UtcNow.AddDays(-2), Progress = "Reps: 10" },
-            new ProgressRecord { Date = DateTime.UtcNow.AddDays(-1), Progress = "Reps: 12" }
-        };
-
-        _exerciseServiceMock.Setup(s => s.GetExerciseByNormalizedNameAsync(exerciseName)).ReturnsAsync(exercise);
-        _exerciseServiceMock.Setup(s => s.EnsureUserExerciseLinkAsync(userId, exercise.Id)).ReturnsAsync(true);
-        _progressRecordRepositoryMock.Setup(r => r.GetProgressRecordsByDateRangeAsync(userId, exercise.Id, null, null)).ReturnsAsync(progressRecords);
-
-        // Act
-        var result = await _progressRecordService.GetExerciseProgressTrendAsync(userId, exerciseName);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Count);
-        Assert.Equal("Reps: 10", result[0].Progress);
-        Assert.Equal("Reps: 12", result[1].Progress);
-    }
-
-    [Fact]
-    public async Task GetExerciseProgressTrendAsync_ShouldThrowException_WhenExerciseDoesNotExist()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var exerciseName = "Nonexistent Exercise";
-
-        _exerciseServiceMock.Setup(s => s.GetExerciseByNormalizedNameAsync(exerciseName)).ReturnsAsync((Exercise?)null);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _progressRecordService.GetExerciseProgressTrendAsync(userId, exerciseName));
-    }
-
-
 }

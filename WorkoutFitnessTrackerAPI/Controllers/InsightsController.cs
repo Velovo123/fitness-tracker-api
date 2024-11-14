@@ -2,7 +2,6 @@
 using System.ComponentModel.DataAnnotations;
 using WorkoutFitnessTracker.API.Services.IServices;
 using WorkoutFitnessTrackerAPI.Controllers;
-using WorkoutFitnessTrackerAPI.Services;
 
 namespace WorkoutFitnessTracker.API.Controllers
 {
@@ -10,13 +9,11 @@ namespace WorkoutFitnessTracker.API.Controllers
     [Route("api/[controller]")]
     public class InsightsController : BaseApiController
     {
-        private readonly IWorkoutService _workoutService;
-        private readonly IProgressRecordService _progressRecordService;
+        private readonly IInsightsService _insightsService;
 
-        public InsightsController(IWorkoutService workoutService, IProgressRecordService progressRecordService)
+        public InsightsController(IInsightsService insightsService)
         {
-            _workoutService = workoutService;
-            _progressRecordService = progressRecordService;
+            _insightsService = insightsService;
         }
 
         [HttpGet("average-workout-duration")]
@@ -29,7 +26,7 @@ namespace WorkoutFitnessTracker.API.Controllers
                 return BadRequest("End date must be greater than start date.");
             }
 
-            var result = await _workoutService.CalculateAverageWorkoutDurationAsync(userId, startDate, endDate);
+            var result = await _insightsService.CalculateAverageWorkoutDurationAsync(userId, startDate, endDate);
             return WrapResponse(true, result, "Average workout duration calculated successfully.");
         }
 
@@ -43,7 +40,7 @@ namespace WorkoutFitnessTracker.API.Controllers
                 return BadRequest("End date must be greater than start date.");
             }
 
-            var result = await _workoutService.GetMostFrequentExercisesAsync(userId, startDate, endDate);
+            var result = await _insightsService.GetMostFrequentExercisesAsync(userId, startDate, endDate);
             return WrapResponse(true, result, "Most frequent exercises retrieved successfully.");
         }
 
@@ -57,7 +54,7 @@ namespace WorkoutFitnessTracker.API.Controllers
                 return BadRequest("End date must be greater than start date.");
             }
 
-            var result = await _progressRecordService.GetExerciseProgressTrendAsync(userId, exerciseName, startDate, endDate);
+            var result = await _insightsService.GetExerciseProgressTrendAsync(userId, exerciseName, startDate, endDate);
             return WrapResponse(true, result, "Exercise progress trend retrieved successfully.");
         }
 
@@ -75,7 +72,7 @@ namespace WorkoutFitnessTracker.API.Controllers
             }
 
             var userId = GetUserId();
-            var result = await _workoutService.GetWeeklyMonthlySummaryAsync(userId, startDate, endDate);
+            var result = await _insightsService.GetWeeklyMonthlySummaryAsync(userId, startDate, endDate);
             return WrapResponse(true, result, "Weekly/Monthly summary retrieved successfully.");
         }
 
@@ -92,9 +89,18 @@ namespace WorkoutFitnessTracker.API.Controllers
                 return BadRequest("End date must be greater than start date.");
             }
 
-            var userId = GetUserId(); // Retrieve user ID from JWT token
-            var result = await _workoutService.GetWeeklyMonthlyComparisonAsync(userId, startDate, endDate, intervalType);
+            var userId = GetUserId();
+            var result = await _insightsService.GetWeeklyMonthlyComparisonAsync(userId, startDate, endDate, intervalType);
             return WrapResponse(true, result, "Weekly/Monthly comparison data retrieved successfully.");
+        }
+
+        [HttpGet("daily-progress")]
+        public async Task<IActionResult> GetDailyProgress([FromQuery][Required] DateTime date)
+        {
+            var userId = GetUserId();
+
+            var result = await _insightsService.GetDailyProgressAsync(userId, date);
+            return WrapResponse(true, result, "Daily progress data retrieved successfully.");
         }
     }
 }

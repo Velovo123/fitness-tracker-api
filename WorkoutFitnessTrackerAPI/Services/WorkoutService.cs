@@ -3,13 +3,11 @@ using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using AutoMapper;
 using WorkoutFitnessTrackerAPI.Models;
-using WorkoutFitnessTrackerAPI.Services.IServices;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using WorkoutFitnessTracker.API.Models.Dto_s.Summary;
-using System.Globalization;
+using WorkoutFitnessTrackerAPI.Services.IServices;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
@@ -62,125 +60,20 @@ namespace WorkoutFitnessTrackerAPI.Services
 
         public async Task<bool> UpdateWorkoutAsync(Guid userId, WorkoutDto workoutDto)
         {
-            // Delete the existing workout for the specified user and date
             var deleteSuccess = await _workoutRepository.DeleteWorkoutAsync(userId, workoutDto.Date);
             if (!deleteSuccess)
             {
                 return false;
             }
 
-            // Create a new workout instance with the updated details
             var newWorkout = _mapper.Map<Workout>(workoutDto);
             newWorkout.UserId = userId;
 
-            // Prepare and add exercises as new entries
             var workoutExercises = await _exerciseService.PrepareExercises<WorkoutExercise>(userId, workoutDto.Exercises);
             newWorkout.WorkoutExercises = workoutExercises;
 
             return await _workoutRepository.CreateWorkoutAsync(newWorkout);
         }
-
-        public async Task<WorkoutStatisticsDto> CalculateAverageWorkoutDurationAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null)
-        {
-            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
-
-            if (!workouts.Any())
-            {
-                throw new InvalidOperationException("No workouts found for the specified date range.");
-            }
-
-            double averageDuration = workouts.Average(w => w.Duration);
-            return new WorkoutStatisticsDto
-            {
-                AverageWorkoutDuration = averageDuration,
-                WorkoutCount = workouts.Count()
-            };
-        }
-
-        public async Task<List<MostFrequentExercisesDto>> GetMostFrequentExercisesAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null)
-        {
-            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
-
-            var mostFrequentExercises = workouts
-                .SelectMany(w => w.WorkoutExercises)
-                .GroupBy(we => we.Exercise.Name)
-                .Select(group => new MostFrequentExercisesDto(group.Key, group.Count()))
-                .OrderByDescending(dto => dto.Frequency)
-                .Take(5)
-                .ToList();
-
-            return mostFrequentExercises;
-        }
-
-        public async Task<WeeklyMonthlySummaryDto> GetWeeklyMonthlySummaryAsync(Guid userId, DateTime startDate, DateTime endDate)
-        {
-            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
-
-            if (!workouts.Any())
-            {
-                throw new InvalidOperationException("No workouts found for the specified date range.");
-            }
-
-            int totalWorkouts = workouts.Count();
-            double averageDuration = workouts.Average(w => w.Duration);
-            int totalReps = workouts.Sum(w => w.WorkoutExercises.Sum(we => we.Reps));
-            int totalSets = workouts.Sum(w => w.WorkoutExercises.Sum(we => we.Sets));
-
-            // Return the summary DTO
-            return new WeeklyMonthlySummaryDto
-            {
-                TotalWorkouts = totalWorkouts,
-                AverageDuration = averageDuration,
-                TotalReps = totalReps,
-                TotalSets = totalSets,
-                StartDate = startDate,
-                EndDate = endDate
-            };
-        }
-
-        public async Task<List<PeriodComparisonDto>> GetWeeklyMonthlyComparisonAsync(Guid userId, DateTime startDate, DateTime endDate, string intervalType)
-        {
-            var workouts = await _workoutRepository.GetWorkoutsByDateRangeAsync(userId, startDate, endDate);
-
-            if (!workouts.Any())
-            {
-                throw new InvalidOperationException("No workouts found for the specified date range.");
-            }
-
-            IEnumerable<IGrouping<object, Workout>> groupedWorkouts = intervalType.ToLower() switch
-            {
-                "weekly" => workouts.GroupBy(w => new { w.Date.Year, Week = ISOWeek.GetWeekOfYear(w.Date) }),
-                "monthly" => workouts.GroupBy(w => new { w.Date.Year, w.Date.Month }) ,
-                _ => throw new ArgumentException("Invalid interval type. Use 'weekly' or 'monthly'.")
-            };
-
-
-            var comparisonData = new List<PeriodComparisonDto>();
-
-            foreach (var group in groupedWorkouts)
-            {
-                var periodStart = group.Min(w => w.Date);
-                var periodEnd = group.Max(w => w.Date);
-                var totalWorkouts = group.Count();
-                var averageDuration = group.Average(w => w.Duration);
-                var totalReps = group.Sum(w => w.WorkoutExercises.Sum(we => we.Reps));
-                var totalSets = group.Sum(w => w.WorkoutExercises.Sum(we => we.Sets));
-
-                comparisonData.Add(new PeriodComparisonDto
-                {
-                    PeriodStart = periodStart,
-                    PeriodEnd = periodEnd,
-                    TotalWorkouts = totalWorkouts,
-                    AverageDuration = averageDuration,
-                    TotalReps = totalReps,
-                    TotalSets = totalSets
-                });
-            }
-
-            return comparisonData;
-        }
-
-
 
         public async Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date)
         {

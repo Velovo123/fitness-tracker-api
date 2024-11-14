@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
-using WorkoutFitnessTracker.API.Models.Dto_s.Summary;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTracker.API.Services.IServices;
 
@@ -77,31 +76,6 @@ namespace WorkoutFitnessTrackerAPI.Services
             recordToUpdate.UserId = userId;
             recordToUpdate.ExerciseId = exercise.Id;
             return await _progressRecordRepository.UpdateProgressRecordAsync(recordToUpdate);
-        }
-
-        public async Task<List<ExerciseProgressTrendDto>> GetExerciseProgressTrendAsync(Guid userId, string exerciseName, DateTime? startDate = null, DateTime? endDate = null)
-        {
-            // Retrieve exercise by normalized name
-            var exercise = await _exerciseService.GetExerciseByNormalizedNameAsync(exerciseName)
-                ?? throw new InvalidOperationException("The specified exercise does not exist.");
-
-            // Ensure the user is linked to the exercise
-            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
-
-            // Retrieve progress records
-            var progressRecords = await _progressRecordRepository.GetProgressRecordsByDateRangeAsync(userId, exercise.Id, startDate, endDate);
-
-            // Map to DTO and order by date
-            var trendData = progressRecords
-                .OrderBy(pr => pr.Date)
-                .Select(pr => new ExerciseProgressTrendDto
-                {
-                    Date = pr.Date,
-                    Progress = pr.Progress
-                })
-                .ToList();
-
-            return trendData;
         }
 
         public async Task<bool> DeleteProgressRecordAsync(Guid userId, DateTime date, string exerciseName)
