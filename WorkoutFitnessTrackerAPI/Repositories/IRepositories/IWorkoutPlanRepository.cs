@@ -10,5 +10,6 @@ namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
         Task<bool> CreateWorkoutPlanAsync(WorkoutPlan workoutPlan);
         Task<bool> UpdateWorkoutPlanAsync(WorkoutPlan workoutPlan);
         Task<bool> DeleteWorkoutPlanAsync(Guid userId, string planName);
+        Task<IEnumerable<WorkoutPlan>> GetWorkoutPlansForDateAsync(Guid userId, DateTime date);
     }
 }

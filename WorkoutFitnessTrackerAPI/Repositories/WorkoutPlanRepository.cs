@@ -60,6 +60,14 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             return await _context.SaveChangesAsync() > 0;
         }
 
+        public async Task<IEnumerable<WorkoutPlan>> GetWorkoutPlansForDateAsync(Guid userId, DateTime date)
+        {
+            return await _context.WorkoutPlans
+                .Where(wp => wp.UserId == userId)
+                .Include(wp => wp.WorkoutPlanExercises)
+                    .ThenInclude(wpe => wpe.Exercise)
+                .ToListAsync();
+        }
         private IQueryable<WorkoutPlan> ApplyFilters(IQueryable<WorkoutPlan> query, WorkoutPlanQueryParams queryParams)
         {
             if (!string.IsNullOrEmpty(queryParams.Goal))
@@ -84,3 +92,4 @@ namespace WorkoutFitnessTrackerAPI.Repositories
         }
     }
 }
+    

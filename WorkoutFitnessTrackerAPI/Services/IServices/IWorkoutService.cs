@@ -10,10 +10,6 @@ namespace WorkoutFitnessTracker.API.Services.IServices
         Task<bool> CreateWorkoutAsync(Guid userId, WorkoutDto workoutDto, bool overwrite = false);
         Task<bool> UpdateWorkoutAsync(Guid userId, WorkoutDto workoutDto);
         Task<bool> DeleteWorkoutAsync(Guid userId, DateTime date);
-        Task<WorkoutStatisticsDto> CalculateAverageWorkoutDurationAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null);
-        Task<List<MostFrequentExercisesDto>> GetMostFrequentExercisesAsync(Guid userId, DateTime? startDate = null, DateTime? endDate = null);
-        Task<WeeklyMonthlySummaryDto> GetWeeklyMonthlySummaryAsync(Guid userId, DateTime startDate, DateTime endDate);
 
-        Task<List<PeriodComparisonDto>> GetWeeklyMonthlyComparisonAsync(Guid userId, DateTime startDate, DateTime endDate, string intervalType);
     }
 }
