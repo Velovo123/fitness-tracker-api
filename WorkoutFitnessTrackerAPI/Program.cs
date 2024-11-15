@@ -15,6 +15,7 @@ using WorkoutFitnessTrackerAPI.Middleware;
 using WorkoutFitnessTracker.API.Services.IServices;
 using WorkoutFitnessTracker.API.Services;
 using Microsoft.AspNetCore.WebSockets;
+using WorkoutFitnessTracker.API.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -113,16 +114,25 @@ using (var scope = app.Services.CreateScope())
     try
     {
         await RoleSeeder.SeedRolesAsync(services);
+
+        var environment = services.GetRequiredService<IWebHostEnvironment>();
+        if (environment.IsDevelopment())
+        {
+            var dbContext = services.GetRequiredService<WFTDbContext>();
+            var scriptPath = Path.Combine(environment.ContentRootPath, "Data", "Scripts", "SeedExercises.sql");
+
+            await ExerciseSeeder.SeedExercisesAsync(dbContext, scriptPath);
+        }
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding roles.");
+        logger.LogError(ex, "An error occurred while seeding data.");
     }
 }
 
 if (app.Environment.IsDevelopment())
-{
+{       
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WorkoutFitnessTrackerAPI v1"));
 }

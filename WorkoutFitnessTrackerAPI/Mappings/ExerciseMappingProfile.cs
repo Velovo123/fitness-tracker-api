@@ -11,10 +11,10 @@ namespace WorkoutFitnessTracker.API.Mappings
         {
             CreateMap<Exercise, ExerciseDto>()
                 .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name))
-                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type))
+                .ForMember(dest => dest.Category, opt => opt.MapFrom(src => src.Category))
                 .ReverseMap()
                 .ForMember(dest => dest.Name, opt => opt.MapFrom(src => NameNormalizationHelper.NormalizeName(src.Name)))
-                .ForMember(dest => dest.Id, opt => opt.Ignore()); // Ignore Id to avoid duplicate entities
+                .ForMember(dest => dest.Id, opt => opt.Ignore()); 
         }
     }
 }

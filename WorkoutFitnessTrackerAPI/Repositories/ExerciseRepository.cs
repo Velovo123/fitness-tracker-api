@@ -37,5 +37,23 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task EnsureUserExerciseLinkAsync(Guid userId, Guid exerciseId)
+        {
+            // Check if the link between the user and exercise already exists
+            var linkExists = await _context.UserExercises
+                .AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == exerciseId);
+
+            // If the link does not exist, create it
+            if (!linkExists)
+            {
+                _context.UserExercises.Add(new UserExercise
+                {
+                    UserId = userId,
+                    ExerciseId = exerciseId
+                });
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 }

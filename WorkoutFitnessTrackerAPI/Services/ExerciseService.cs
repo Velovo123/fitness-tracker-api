@@ -1,10 +1,9 @@
-﻿using WorkoutFitnessTrackerAPI.Data;
-using WorkoutFitnessTrackerAPI.Models;
+﻿using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
 using WorkoutFitnessTrackerAPI.Models.Dto_s.IDto_s;
 using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Services.IServices;
-using Microsoft.EntityFrameworkCore;
+using WorkoutFitnessTrackerAPI.Repositories.IRepositories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,11 +14,11 @@ namespace WorkoutFitnessTrackerAPI.Services
 {
     public class ExerciseService : IExerciseService
     {
-        private readonly WFTDbContext _context;
+        private readonly IExerciseRepository _exerciseRepository;
 
-        public ExerciseService(WFTDbContext context)
+        public ExerciseService(IExerciseRepository exerciseRepository)
         {
-            _context = context;
+            _exerciseRepository = exerciseRepository ?? throw new ArgumentNullException(nameof(exerciseRepository));
         }
 
         public async Task<string> NormalizeExerciseNameAsync(string exerciseName)
@@ -33,11 +32,19 @@ namespace WorkoutFitnessTrackerAPI.Services
 
             foreach (var exerciseDto in exercises)
             {
+                // Normalize the exercise name and retrieve the exercise
                 var standardizedExerciseName = await NormalizeExerciseNameAsync(exerciseDto.ExerciseName);
-                var exercise = await GetOrCreateExerciseAsync(standardizedExerciseName, exerciseDto);
+                var exercise = await _exerciseRepository.GetByNameAsync(standardizedExerciseName);
 
-                await EnsureUserExerciseLinkAsync(userId, exercise.Id);
+                if (exercise == null)
+                {
+                    throw new InvalidOperationException($"Exercise '{exerciseDto.ExerciseName}' not found.");
+                }
 
+                // Ensure user-exercise link
+                await _exerciseRepository.EnsureUserExerciseLinkAsync(userId, exercise.Id);
+
+                // Create an instance of the target type (WorkoutExercise or WorkoutPlanExercise)
                 var preparedExercise = CreateExerciseInstance<T>(exercise.Id, exerciseDto);
                 if (preparedExercise != null)
                 {
@@ -55,66 +62,29 @@ namespace WorkoutFitnessTrackerAPI.Services
             return preparedExercises;
         }
 
+        public async Task<bool> EnsureUserExerciseLinkAsync(Guid userId, string exerciseName)
+        {
+            var normalizedExerciseName = await NormalizeExerciseNameAsync(exerciseName);
+            var exercise = await _exerciseRepository.GetByNameAsync(normalizedExerciseName);
+
+            if (exercise == null)
+            {
+                throw new InvalidOperationException($"Exercise with name '{exerciseName}' not found.");
+            }
+
+            await _exerciseRepository.EnsureUserExerciseLinkAsync(userId, exercise.Id);
+            return true;
+        }
+
         public async Task<Exercise> GetExerciseByNormalizedNameAsync(string exerciseName)
         {
             var normalizedExerciseName = NameNormalizationHelper.NormalizeName(exerciseName);
-            return await _context.Exercises.FirstOrDefaultAsync(ex => ex.Name == normalizedExerciseName);
-        }
-
-        public async Task<bool> EnsureUserExerciseLinkAsync(Guid userId, Guid exerciseId)
-        {
-            var userExerciseLinkExists = await _context.UserExercises
-                .AnyAsync(ue => ue.UserId == userId && ue.ExerciseId == exerciseId);
-
-            if (!userExerciseLinkExists)
-            {
-                _context.UserExercises.Add(new UserExercise
-                {
-                    UserId = userId,
-                    ExerciseId = exerciseId
-                });
-
-                await _context.SaveChangesAsync();
-            }
-
-            return true;
+            return await _exerciseRepository.GetByNameAsync(normalizedExerciseName);
         }
 
         public async Task<IEnumerable<Exercise>> GetAllExercisesAsync()
         {
-            return await _context.Exercises.AsNoTracking().ToListAsync();
-        }
-
-        public async Task<Exercise> AddExerciseAsync(ExerciseDto exerciseDto)
-        {
-            var normalizedExerciseName = await NormalizeExerciseNameAsync(exerciseDto.Name);
-            var exercise = new Exercise
-            {
-                Id = Guid.NewGuid(),
-                Name = normalizedExerciseName,
-                Type = exerciseDto.Type
-            };
-            _context.Exercises.Add(exercise);
-            await _context.SaveChangesAsync();
-            return exercise;
-        }
-
-        private async Task<Exercise> GetOrCreateExerciseAsync(string standardizedExerciseName, IExerciseDto exerciseDto)
-        {
-            var exercise = await _context.Exercises.FirstOrDefaultAsync(ex => ex.Name == standardizedExerciseName);
-            if (exercise == null)
-            {
-                exercise = new Exercise
-                {
-                    Id = Guid.NewGuid(),
-                    Name = standardizedExerciseName,
-                    Type = (exerciseDto as WorkoutExerciseDto)?.Type
-                };
-
-                _context.Exercises.Add(exercise);
-                await _context.SaveChangesAsync();
-            }
-            return exercise;
+            return await _exerciseRepository.GetAllExercisesAsync();
         }
 
         private static T? CreateExerciseInstance<T>(Guid exerciseId, IExerciseDto exerciseDto) where T : class, new()

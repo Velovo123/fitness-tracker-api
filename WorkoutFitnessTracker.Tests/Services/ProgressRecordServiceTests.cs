@@ -85,7 +85,7 @@ public class ProgressRecordServiceTests
 
         _exerciseServiceMock.Setup(s => s.NormalizeExerciseNameAsync(progressRecordDto.ExerciseName)).ReturnsAsync(normalizedExerciseName);
         _exerciseServiceMock.Setup(s => s.GetExerciseByNormalizedNameAsync(normalizedExerciseName)).ReturnsAsync(exercise);
-        _exerciseServiceMock.Setup(s => s.EnsureUserExerciseLinkAsync(userId, exercise.Id)).ReturnsAsync(true);
+        _exerciseServiceMock.Setup(s => s.EnsureUserExerciseLinkAsync(userId, exercise.Name)).ReturnsAsync(true);
         _progressRecordRepositoryMock.Setup(r => r.GetProgressRecordByDateAsync(userId, progressRecordDto.Date, normalizedExerciseName)).ReturnsAsync(existingRecord);
         _progressRecordRepositoryMock.Setup(r => r.UpdateProgressRecordAsync(It.IsAny<ProgressRecord>())).ReturnsAsync(true);
 
@@ -109,7 +109,7 @@ public class ProgressRecordServiceTests
 
         _exerciseServiceMock.Setup(s => s.NormalizeExerciseNameAsync(progressRecordDto.ExerciseName)).ReturnsAsync(normalizedExerciseName);
         _exerciseServiceMock.Setup(s => s.GetExerciseByNormalizedNameAsync(normalizedExerciseName)).ReturnsAsync(exercise);
-        _exerciseServiceMock.Setup(s => s.EnsureUserExerciseLinkAsync(userId, exercise.Id)).ReturnsAsync(true);
+        _exerciseServiceMock.Setup(s => s.EnsureUserExerciseLinkAsync(userId, exercise.Name)).ReturnsAsync(true);
         _progressRecordRepositoryMock.Setup(r => r.GetProgressRecordByDateAsync(userId, progressRecordDto.Date, normalizedExerciseName)).ReturnsAsync(existingRecord);
 
         // Act & Assert
@@ -127,7 +127,7 @@ public class ProgressRecordServiceTests
 
         _exerciseServiceMock.Setup(s => s.NormalizeExerciseNameAsync(progressRecordDto.ExerciseName)).ReturnsAsync(normalizedExerciseName);
         _exerciseServiceMock.Setup(s => s.GetExerciseByNormalizedNameAsync(normalizedExerciseName)).ReturnsAsync(exercise);
-        _exerciseServiceMock.Setup(s => s.EnsureUserExerciseLinkAsync(userId, exercise.Id)).ReturnsAsync(true);
+        _exerciseServiceMock.Setup(s => s.EnsureUserExerciseLinkAsync(userId, exercise.Name)).ReturnsAsync(true);
         _progressRecordRepositoryMock.Setup(r => r.UpdateProgressRecordAsync(It.IsAny<ProgressRecord>())).ReturnsAsync(true);
 
         // Act
