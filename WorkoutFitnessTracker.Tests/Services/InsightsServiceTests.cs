@@ -148,7 +148,7 @@ public class InsightsServiceTests
         };
 
         _exerciseServiceMock.Setup(service => service.GetExerciseByNormalizedNameAsync(exerciseName)).ReturnsAsync(exercise);
-        _exerciseServiceMock.Setup(service => service.EnsureUserExerciseLinkAsync(userId, exercise.Id)).Returns(Task.FromResult(true));
+        _exerciseServiceMock.Setup(service => service.EnsureUserExerciseLinkAsync(userId, exercise.Name)).Returns(Task.FromResult(true));
         _progressRecordRepositoryMock.Setup(repo => repo.GetProgressRecordsByDateRangeAsync(userId, exercise.Id, null, null))
                                      .ReturnsAsync(progressRecords);
 

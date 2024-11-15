@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Moq;
 using WorkoutFitnessTracker.API.Models.Dto_s.Exercise;
-using WorkoutFitnessTrackerAPI.Data;
 using WorkoutFitnessTrackerAPI.Helpers;
 using WorkoutFitnessTrackerAPI.Models;
 using WorkoutFitnessTrackerAPI.Models.Dto_s;
@@ -18,16 +16,11 @@ public class ExerciseServiceTests
 {
     private readonly ExerciseService _service;
     private readonly Mock<IExerciseRepository> _exerciseRepositoryMock;
-    private readonly WFTDbContext _dbContext;
 
     public ExerciseServiceTests()
     {
-        var options = new DbContextOptionsBuilder<WFTDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        _dbContext = new WFTDbContext(options);
         _exerciseRepositoryMock = new Mock<IExerciseRepository>();
-        _service = new ExerciseService(_dbContext);
+        _service = new ExerciseService(_exerciseRepositoryMock.Object);
     }
 
     [Fact]
@@ -51,6 +44,11 @@ public class ExerciseServiceTests
             new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 4, Reps = 8 }
         };
 
+        // Mock GetOrCreateExerciseAsync behavior
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetByNameAsync(It.IsAny<string>()))
+            .ReturnsAsync((string name) => new Exercise { Id = Guid.NewGuid(), Name = name });
+
         var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
 
         Assert.Equal(2, result.Count);
@@ -60,21 +58,32 @@ public class ExerciseServiceTests
     public async Task PrepareExercises_ShouldRemoveDuplicateExercises_WhenExercisesHaveSameNameSetsAndReps()
     {
         var userId = Guid.NewGuid();
+        var squatId = Guid.NewGuid();
+        var benchPressId = Guid.NewGuid();
+
         var exercises = new List<IExerciseDto>
-        {
-            new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 3, Reps = 10 },
-            new WorkoutExerciseDto { ExerciseName = "squat", Sets = 3, Reps = 10 },
-            new WorkoutExerciseDto { ExerciseName = "Bench Press", Sets = 4, Reps = 8 }
-        };
+    {
+        new WorkoutExerciseDto { ExerciseName = "Squat", Sets = 3, Reps = 10 },
+        new WorkoutExerciseDto { ExerciseName = "squat", Sets = 3, Reps = 10 },
+        new WorkoutExerciseDto { ExerciseName = "Bench Press", Sets = 4, Reps = 8 }
+    };
+
+        // Set up the mock repository to return an exercise with consistent IDs based on the normalized name
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetByNameAsync(It.Is<string>(name => name.Equals("squat", StringComparison.OrdinalIgnoreCase))))
+            .ReturnsAsync(new Exercise { Id = squatId, Name = "squat" });
 
         _exerciseRepositoryMock
-            .Setup(repo => repo.GetByNameAsync(It.IsAny<string>()))
-            .ReturnsAsync((string name) => new Exercise { Id = Guid.NewGuid(), Name = name });
+            .Setup(repo => repo.GetByNameAsync(It.Is<string>(name => name.Equals("benchpress", StringComparison.OrdinalIgnoreCase))))
+            .ReturnsAsync(new Exercise { Id = benchPressId, Name = "bench press" });
 
+        // Act
         var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
 
-        Assert.Equal(2, result.Count);
+        // Assert
+        Assert.Equal(2, result.Count); // Expecting two unique exercises: Squat and Bench Press
     }
+
 
     [Fact]
     public async Task PrepareExercises_ShouldAllowSameExerciseWithDifferentSetsOrReps()
@@ -100,19 +109,25 @@ public class ExerciseServiceTests
     public async Task PrepareExercises_ShouldNormalizeExerciseNames_WhenNamesAreInconsistent()
     {
         var userId = Guid.NewGuid();
+        var normalizedExerciseName = "benchpress"; // Expected normalized name based on the normalization logic.
+        var exerciseId = Guid.NewGuid();
+
         var exercises = new List<IExerciseDto>
-        {
-            new WorkoutExerciseDto { ExerciseName = "Bench Press", Sets = 3, Reps = 10 },
-            new WorkoutExerciseDto { ExerciseName = "bench press", Sets = 3, Reps = 10 }
-        };
+    {
+        new WorkoutExerciseDto { ExerciseName = "Bench Press", Sets = 3, Reps = 10 },
+        new WorkoutExerciseDto { ExerciseName = "bench press", Sets = 3, Reps = 10 }
+    };
 
+        // Set up the mock to return the same Exercise object for normalized names
         _exerciseRepositoryMock
-            .Setup(repo => repo.GetByNameAsync(It.IsAny<string>()))
-            .ReturnsAsync((string name) => new Exercise { Id = Guid.NewGuid(), Name = name });
+            .Setup(repo => repo.GetByNameAsync(normalizedExerciseName))
+            .ReturnsAsync(new Exercise { Id = exerciseId, Name = "Bench Press" });
 
+        // Act
         var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
 
-        Assert.Single(result);
+        // Assert
+        Assert.Single(result); // Expecting only one unique entry
     }
 
     [Fact]
@@ -131,9 +146,6 @@ public class ExerciseServiceTests
 
         var result = await _service.PrepareExercises<WorkoutExercise>(userId, exercises);
 
-        foreach (var exercise in result)
-        {
-            Assert.Contains(_dbContext.UserExercises, ue => ue.UserId == userId && ue.ExerciseId == ((WorkoutExercise)exercise).ExerciseId);
-        }
+        _exerciseRepositoryMock.Verify(repo => repo.EnsureUserExerciseLinkAsync(userId, It.IsAny<Guid>()), Times.Exactly(2));
     }
 }

@@ -130,7 +130,7 @@ namespace WorkoutFitnessTrackerAPI.Services
             var exercise = await _exerciseService.GetExerciseByNormalizedNameAsync(exerciseName)
                           ?? throw new InvalidOperationException("The specified exercise does not exist.");
 
-            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
+            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Name);
 
             var progressRecords = await _progressRecordRepository.GetProgressRecordsByDateRangeAsync(userId, exercise.Id, startDate, endDate);
 

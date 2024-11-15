@@ -43,7 +43,7 @@ namespace WorkoutFitnessTrackerAPI.Services
                           ?? throw new InvalidOperationException("The specified exercise does not exist.");
 
             // Ensure the user is linked to the exercise
-            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
+            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Name);
 
             var existingRecord = await _progressRecordRepository.GetProgressRecordByDateAsync(userId, progressRecordDto.Date, normalizedExerciseName);
             if (existingRecord != null)
@@ -70,7 +70,7 @@ namespace WorkoutFitnessTrackerAPI.Services
                           ?? throw new InvalidOperationException("The specified exercise does not exist.");
 
             // Ensure the user is linked to the exercise
-            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Id);
+            await _exerciseService.EnsureUserExerciseLinkAsync(userId, exercise.Name);
 
             var recordToUpdate = _mapper.Map<ProgressRecord>(progressRecordDto);
             recordToUpdate.UserId = userId;
