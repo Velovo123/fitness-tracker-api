@@ -55,5 +55,16 @@ namespace WorkoutFitnessTrackerAPI.Repositories
                 await _context.SaveChangesAsync();
             }
         }
+
+        public async Task<IEnumerable<Exercise>> GetUserLinkedExercisesAsync(Guid userId)
+        {
+            return await _context.UserExercises
+                .Where(ue => ue.UserId == userId)
+                .Include(ue => ue.Exercise)
+                .Select(ue => ue.Exercise)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
     }
 }

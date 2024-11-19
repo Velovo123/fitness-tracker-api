@@ -206,4 +206,141 @@ public class InsightsServiceTests
         Assert.Equal(3, result.Exercises[0].ActualSets);
         Assert.Equal(10, result.Exercises[0].ActualReps);
     }
+
+    [Fact]
+    public async Task RecommendUnderutilizedExercisesAsync_ShouldReturnUnderutilizedExercises()
+    {
+        var userId = Guid.NewGuid();
+
+        // Mock all exercises
+        var allExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" },
+            new Exercise { Name = "Deadlift", Category = "strength", PrimaryMuscles = "back" },
+            new Exercise { Name = "Squat", Category = "strength", PrimaryMuscles = "legs" }
+        };
+
+        // Mock linked exercises
+        var linkedExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" }
+        };
+
+        // Set up mocked dependencies
+        _exerciseServiceMock.Setup(service => service.GetAllExercisesAsync())
+            .ReturnsAsync(allExercises);
+        _exerciseServiceMock.Setup(service => service.GetUserLinkedExercisesAsync(userId))
+            .ReturnsAsync(linkedExercises);
+
+        // Act
+        var result = await _insightsService.RecommendUnderutilizedExercisesAsync(userId);
+
+        // Assert
+        Assert.Contains("Deadlift", result);
+        Assert.Contains("Squat", result);
+        Assert.DoesNotContain("Bench Press", result);
+    }
+
+    [Fact]
+    public async Task RecommendUnderutilizedExercisesAsync_ShouldReturnFilteredByCategory()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+
+        // Mock all exercises
+        var allExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" },
+            new Exercise { Name = "Deadlift", Category = "strength", PrimaryMuscles = "back" },
+            new Exercise { Name = "Yoga Stretch", Category = "stretching", PrimaryMuscles = "legs" }
+        };
+
+        // Mock linked exercises
+        var linkedExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" }
+        };
+
+        // Set up mocked dependencies
+        _exerciseServiceMock.Setup(service => service.GetAllExercisesAsync())
+            .ReturnsAsync(allExercises);
+        _exerciseServiceMock.Setup(service => service.GetUserLinkedExercisesAsync(userId))
+            .ReturnsAsync(linkedExercises);
+
+        // Act
+        var result = await _insightsService.RecommendUnderutilizedExercisesAsync(userId, category: "stretching");
+
+        // Assert
+        Assert.Contains("Yoga Stretch", result);
+        Assert.DoesNotContain("Bench Press", result);
+        Assert.DoesNotContain("Deadlift", result);
+    }
+
+    [Fact]
+    public async Task RecommendUnderutilizedExercisesAsync_ShouldReturnLimitedExercises()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+
+        // Mock all exercises
+        var allExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" },
+            new Exercise { Name = "Deadlift", Category = "strength", PrimaryMuscles = "back" },
+            new Exercise { Name = "Squat", Category = "strength", PrimaryMuscles = "legs" },
+            new Exercise { Name = "Pull-Up", Category = "strength", PrimaryMuscles = "back" },
+            new Exercise { Name = "Plank", Category = "core", PrimaryMuscles = "abs" },
+            new Exercise { Name = "Yoga Stretch", Category = "stretching", PrimaryMuscles = "legs" }
+        };
+
+        // Mock linked exercises
+        var linkedExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" }
+        };
+
+        // Set up mocked dependencies
+        _exerciseServiceMock.Setup(service => service.GetAllExercisesAsync())
+            .ReturnsAsync(allExercises);
+        _exerciseServiceMock.Setup(service => service.GetUserLinkedExercisesAsync(userId))
+            .ReturnsAsync(linkedExercises);
+
+        // Act
+        var result = await _insightsService.RecommendUnderutilizedExercisesAsync(userId);
+
+        // Assert
+        Assert.True(result.Count <= 5);
+    }
+
+    [Fact]
+    public async Task RecommendUnderutilizedExercisesAsync_ShouldReturnEmpty_WhenAllMusclesTrained()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+
+        // Mock all exercises
+        var allExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" }
+        };
+
+        // Mock linked exercises (all muscles trained)
+        var linkedExercises = new List<Exercise>
+        {
+            new Exercise { Name = "Bench Press", Category = "strength", PrimaryMuscles = "chest" }
+        };
+
+        // Set up mocked dependencies
+        _exerciseServiceMock.Setup(service => service.GetAllExercisesAsync())
+            .ReturnsAsync(allExercises);
+        _exerciseServiceMock.Setup(service => service.GetUserLinkedExercisesAsync(userId))
+            .ReturnsAsync(linkedExercises);
+
+        // Act
+        var result = await _insightsService.RecommendUnderutilizedExercisesAsync(userId);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
 }

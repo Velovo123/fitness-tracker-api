@@ -82,6 +82,12 @@ namespace WorkoutFitnessTrackerAPI.Services
             return await _exerciseRepository.GetByNameAsync(normalizedExerciseName);
         }
 
+        public async Task<IEnumerable<Exercise>> GetUserLinkedExercisesAsync(Guid userId)
+        {
+            return await _exerciseRepository.GetUserLinkedExercisesAsync(userId);
+        }
+
+
         public async Task<IEnumerable<Exercise>> GetAllExercisesAsync()
         {
             return await _exerciseRepository.GetAllExercisesAsync();

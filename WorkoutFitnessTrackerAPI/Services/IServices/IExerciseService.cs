@@ -15,5 +15,6 @@ namespace WorkoutFitnessTrackerAPI.Services.IServices
         Task<Exercise> GetExerciseByNormalizedNameAsync(string exerciseName);
         Task<IEnumerable<Exercise>> GetAllExercisesAsync();
         Task<bool> EnsureUserExerciseLinkAsync(Guid userId, string exerciseName);
+        Task<IEnumerable<Exercise>> GetUserLinkedExercisesAsync(Guid userId);
     }
 }

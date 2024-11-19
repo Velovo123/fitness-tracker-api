@@ -14,10 +14,11 @@ namespace WorkoutFitnessTrackerAPI.Mappings
 
             CreateMap<WorkoutExercise, WorkoutExerciseDto>()
                 .ForMember(dest => dest.ExerciseName, opt => opt.MapFrom(src => src.Exercise.Name))
-                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Exercise.Category ?? "Unknown"))
+                .ForMember(dest => dest.Category, opt => opt.MapFrom(src => src.Exercise.Category ?? "Unknown"))
                 .ReverseMap()
                 .ForPath(dest => dest.Exercise.Name, opt => opt.MapFrom(src => src.ExerciseName))
-                .ForPath(dest => dest.Exercise.Category, opt => opt.MapFrom(src => src.Type));
+                .ForPath(dest => dest.Exercise.Category, opt => opt.MapFrom(src => src.Category));
         }
     }
 }
+    

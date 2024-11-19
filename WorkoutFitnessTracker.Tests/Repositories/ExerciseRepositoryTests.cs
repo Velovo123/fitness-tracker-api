@@ -86,4 +86,70 @@ public class ExerciseRepositoryTests
         Assert.Contains(result, e => e.Name == "Exercise 1");
         Assert.Contains(result, e => e.Name == "Exercise 2");
     }
+    [Fact]
+    public async Task GetUserLinkedExercisesAsync_ReturnsLinkedExercises_WhenUserHasLinkedExercises()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var exercise1 = new Exercise { Id = Guid.NewGuid(), Name = "Bench Press", PrimaryMuscles = "chest" };
+        var exercise2 = new Exercise { Id = Guid.NewGuid(), Name = "Squat", PrimaryMuscles = "legs" };
+
+        var userExercise1 = new UserExercise { UserId = userId, ExerciseId = exercise1.Id, Exercise = exercise1 };
+        var userExercise2 = new UserExercise { UserId = userId, ExerciseId = exercise2.Id, Exercise = exercise2 };
+
+        await _context.Exercises.AddRangeAsync(exercise1, exercise2);
+        await _context.UserExercises.AddRangeAsync(userExercise1, userExercise2);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _repository.GetUserLinkedExercisesAsync(userId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        Assert.Contains(result, e => e.Name == "Bench Press");
+        Assert.Contains(result, e => e.Name == "Squat");
+    }
+
+    [Fact]
+    public async Task GetUserLinkedExercisesAsync_ReturnsEmpty_WhenUserHasNoLinkedExercises()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+
+        // Act
+        var result = await _repository.GetUserLinkedExercisesAsync(userId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetUserLinkedExercisesAsync_DoesNotReturnUnlinkedExercises()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+
+        var exercise1 = new Exercise { Id = Guid.NewGuid(), Name = "Deadlift", PrimaryMuscles = "back" };
+        var exercise2 = new Exercise { Id = Guid.NewGuid(), Name = "Plank", PrimaryMuscles = "core" };
+
+        var userExercise1 = new UserExercise { UserId = userId, ExerciseId = exercise1.Id, Exercise = exercise1 };
+        var otherUserExercise = new UserExercise { UserId = otherUserId, ExerciseId = exercise2.Id, Exercise = exercise2 };
+
+        await _context.Exercises.AddRangeAsync(exercise1, exercise2);
+        await _context.UserExercises.AddRangeAsync(userExercise1, otherUserExercise);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _repository.GetUserLinkedExercisesAsync(userId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Contains(result, e => e.Name == "Deadlift");
+        Assert.DoesNotContain(result, e => e.Name == "Plank");
+    }
+
 }

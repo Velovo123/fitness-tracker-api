@@ -212,4 +212,68 @@ public class InsightsControllerTests
         Assert.Equal("Daily progress data retrieved successfully.", response.Message);
         Assert.Equal(dailyProgressDto, response.Data);
     }
+
+    [Fact]
+    public async Task GetUnderutilizedExercises_ReturnsOk_WithRecommendations()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var recommendations = new List<string> { "Deadlift", "Pull-Up", "Plank" };
+
+        // Mock the GetUserId method to return the userId
+        _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(
+            new ClaimsIdentity(new Claim[]
+            {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            })
+        );
+
+        // Mock the InsightsService to return recommendations
+        _insightsServiceMock
+            .Setup(service => service.RecommendUnderutilizedExercisesAsync(userId, null))
+            .ReturnsAsync(recommendations);
+
+        // Act
+        var result = await _controller.GetUnderutilizedExercises(null);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<List<string>>>(okResult.Value);
+        Assert.True(response.Success);
+        Assert.Equal("Underutilized exercises retrieved successfully.", response.Message);
+        Assert.Equal(recommendations, response.Data);
+    }
+
+    [Fact]
+    public async Task GetUnderutilizedExercises_ReturnsBadRequest_WithInvalidCategory()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+
+        // Mock the GetUserId method to return the userId
+        _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(
+            new ClaimsIdentity(new Claim[]
+            {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            })
+        );
+
+        // Mock the InsightsService to return no recommendations for invalid input
+        _insightsServiceMock
+            .Setup(service => service.RecommendUnderutilizedExercisesAsync(userId, "invalid-category"))
+            .ReturnsAsync(new List<string>());
+
+        // Act
+        var result = await _controller.GetUnderutilizedExercises("invalid-category");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ResponseWrapper<List<string>>>(okResult.Value);
+        Assert.True(response.Success);
+        Assert.Empty(response.Data);
+        Assert.Equal("Underutilized exercises retrieved successfully.", response.Message);
+    }
+
+
+
 }

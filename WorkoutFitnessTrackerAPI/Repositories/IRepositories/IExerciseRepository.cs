@@ -10,5 +10,6 @@ namespace WorkoutFitnessTrackerAPI.Repositories.IRepositories
         Task<Exercise> AddAsync(Exercise exercise);
         Task<IEnumerable<Exercise>> GetAllExercisesAsync();
         public Task EnsureUserExerciseLinkAsync(Guid userId, Guid exerciseId);
+        Task<IEnumerable<Exercise>> GetUserLinkedExercisesAsync(Guid userId);
     }
 }

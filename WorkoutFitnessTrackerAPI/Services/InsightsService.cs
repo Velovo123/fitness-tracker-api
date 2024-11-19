@@ -190,6 +190,28 @@ namespace WorkoutFitnessTrackerAPI.Services
                 Exercises = exerciseProgress
             };
         }
+        public async Task<List<string>> RecommendUnderutilizedExercisesAsync(Guid userId, string category = null)
+        {
+            var allExercises = await _exerciseService.GetAllExercisesAsync();
+
+            var linkedExercises = await _exerciseService.GetUserLinkedExercisesAsync(userId);
+
+            var trainedMuscles = linkedExercises
+                .SelectMany(ex => ex.PrimaryMuscles)
+                .Distinct()
+                .ToList();
+
+            var underutilizedExercises = allExercises
+                .Where(ex => !trainedMuscles.Contains(ex.PrimaryMuscles.FirstOrDefault())) 
+                .Where(ex => string.IsNullOrEmpty(category) || ex.Category == category)    
+                .OrderBy(ex => Guid.NewGuid()) 
+                .Take(5) 
+                .Select(ex => ex.Name)
+                .ToList();
+
+            return underutilizedExercises;
+        }
+
 
     }
 }
