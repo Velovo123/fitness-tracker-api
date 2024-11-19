@@ -148,4 +148,67 @@ public class ExerciseServiceTests
 
         _exerciseRepositoryMock.Verify(repo => repo.EnsureUserExerciseLinkAsync(userId, It.IsAny<Guid>()), Times.Exactly(2));
     }
+
+    [Fact]
+    public async Task GetUserLinkedExercisesAsync_ShouldReturnLinkedExercises_WhenUserHasLinkedExercises()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var exercise1 = new Exercise { Id = Guid.NewGuid(), Name = "Bench Press", PrimaryMuscles = "chest" };
+        var exercise2 = new Exercise { Id = Guid.NewGuid(), Name = "Squat", PrimaryMuscles = "legs" };
+
+        var linkedExercises = new List<Exercise> { exercise1, exercise2 };
+
+        // Set up the mock repository
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetUserLinkedExercisesAsync(userId))
+            .ReturnsAsync(linkedExercises);
+
+        // Act
+        var result = await _service.GetUserLinkedExercisesAsync(userId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        Assert.Contains(result, e => e.Name == "Bench Press");
+        Assert.Contains(result, e => e.Name == "Squat");
+    }
+
+    [Fact]
+    public async Task GetUserLinkedExercisesAsync_ShouldReturnEmpty_WhenUserHasNoLinkedExercises()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+
+        // Set up the mock repository to return an empty list
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetUserLinkedExercisesAsync(userId))
+            .ReturnsAsync(new List<Exercise>());
+
+        // Act
+        var result = await _service.GetUserLinkedExercisesAsync(userId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetUserLinkedExercisesAsync_ShouldNotReturnNull()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+
+        // Ensure the mock repository returns an empty list rather than null
+        _exerciseRepositoryMock
+            .Setup(repo => repo.GetUserLinkedExercisesAsync(userId))
+            .ReturnsAsync(Enumerable.Empty<Exercise>());
+
+        // Act
+        var result = await _service.GetUserLinkedExercisesAsync(userId);
+
+        // Assert
+        Assert.NotNull(result); // Ensure the result is not null
+    }
+
 }

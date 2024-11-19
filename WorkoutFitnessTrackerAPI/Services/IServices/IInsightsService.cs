@@ -10,5 +10,6 @@ namespace WorkoutFitnessTracker.API.Services.IServices
         Task<List<PeriodComparisonDto>> GetWeeklyMonthlyComparisonAsync(Guid userId, DateTime startDate, DateTime endDate, string intervalType);
         Task<List<ExerciseProgressTrendDto>> GetExerciseProgressTrendAsync(Guid userId, string exerciseName, DateTime? startDate = null, DateTime? endDate = null);
         Task<DailyProgressDto> GetDailyProgressAsync(Guid userId, DateTime date);
+        Task<List<string>> RecommendUnderutilizedExercisesAsync(Guid userId, string category = null);
     }
 }

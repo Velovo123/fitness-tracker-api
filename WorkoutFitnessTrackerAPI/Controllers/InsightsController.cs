@@ -102,5 +102,15 @@ namespace WorkoutFitnessTracker.API.Controllers
             var result = await _insightsService.GetDailyProgressAsync(userId, date);
             return WrapResponse(true, result, "Daily progress data retrieved successfully.");
         }
+
+        [HttpGet("recommendations/underutilized-exercises")]
+        public async Task<IActionResult> GetUnderutilizedExercises([FromQuery] string? category = null)
+        {
+            var userId = GetUserId();
+
+            var result = await _insightsService.RecommendUnderutilizedExercisesAsync(userId, category);
+
+            return WrapResponse(true, result, "Underutilized exercises retrieved successfully.");
+        }
     }
 }

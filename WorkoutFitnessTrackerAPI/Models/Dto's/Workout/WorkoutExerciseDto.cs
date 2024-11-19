@@ -18,6 +18,6 @@ namespace WorkoutFitnessTrackerAPI.Models.Dto_s
         public int Reps { get; init; }
 
         [MaxLength(50, ErrorMessage = "Type cannot exceed 50 characters.")]
-        public string? Type { get; init; } = null;
+        public string? Category { get; init; } = null;
     }
 }
