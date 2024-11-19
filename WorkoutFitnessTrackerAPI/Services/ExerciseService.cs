@@ -9,12 +9,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WorkoutFitnessTracker.API.Models.Dto_s.Exercise;
+using F23.StringSimilarity;
 
 namespace WorkoutFitnessTrackerAPI.Services
 {
     public class ExerciseService : IExerciseService
     {
+        private static List<string>? _exerciseCache;
+        private static DateTime _cacheExpirationTime;
         private readonly IExerciseRepository _exerciseRepository;
+        private readonly object _cacheLock = new(); // Ensure thread safety for the cache
 
         public ExerciseService(IExerciseRepository exerciseRepository)
         {
@@ -26,25 +30,48 @@ namespace WorkoutFitnessTrackerAPI.Services
             return await Task.FromResult(NameNormalizationHelper.NormalizeName(exerciseName));
         }
 
+        private async Task<List<string>> SuggestExercisesAsync(string input)
+        {
+            // Normalize user input
+            var normalizedInput = await NormalizeExerciseNameAsync(input);
+
+            // Fetch all exercise names from the cache
+            var allExerciseNames = await GetCachedExerciseNamesAsync();
+
+            // Use Levenshtein for fuzzy matching
+            var levenshtein = new Levenshtein();
+            var suggestions = allExerciseNames
+                .Select(name => new
+                {
+                    Name = name,
+                    Distance = levenshtein.Distance(normalizedInput, name.ToLower())
+                })
+                .OrderBy(x => x.Distance) // Closest matches first
+                .Take(5)                  // Limit to top 5
+                .Select(x => x.Name)
+                .ToList();
+
+            return suggestions;
+        }
+
         public async Task<List<T>> PrepareExercises<T>(Guid userId, IEnumerable<IExerciseDto> exercises) where T : class, new()
         {
             var preparedExercises = new List<T>();
 
             foreach (var exerciseDto in exercises)
             {
-                // Normalize the exercise name and retrieve the exercise
                 var standardizedExerciseName = await NormalizeExerciseNameAsync(exerciseDto.ExerciseName);
                 var exercise = await _exerciseRepository.GetByNameAsync(standardizedExerciseName);
 
                 if (exercise == null)
                 {
-                    throw new InvalidOperationException($"Exercise '{exerciseDto.ExerciseName}' not found.");
+                    var suggestions = await SuggestExercisesAsync(exerciseDto.ExerciseName);
+                    throw new InvalidOperationException(
+                        $"Exercise '{exerciseDto.ExerciseName}' not found. Did you mean: {string.Join(", ", suggestions)}?");
                 }
 
-                // Ensure user-exercise link
                 await _exerciseRepository.EnsureUserExerciseLinkAsync(userId, exercise.Id);
 
-                // Create an instance of the target type (WorkoutExercise or WorkoutPlanExercise)
                 var preparedExercise = CreateExerciseInstance<T>(exercise.Id, exerciseDto);
                 if (preparedExercise != null)
                 {
@@ -87,11 +114,38 @@ namespace WorkoutFitnessTrackerAPI.Services
             return await _exerciseRepository.GetUserLinkedExercisesAsync(userId);
         }
 
-
         public async Task<IEnumerable<Exercise>> GetAllExercisesAsync()
         {
             return await _exerciseRepository.GetAllExercisesAsync();
         }
+
+        private async Task<List<string>> GetCachedExerciseNamesAsync()
+        {
+            lock (_cacheLock)
+            {
+                if (_exerciseCache != null && DateTime.UtcNow < _cacheExpirationTime)
+                {
+                    return _exerciseCache;
+                }
+            }
+
+            // Fetch fresh data outside the lock to avoid deadlocks
+            var freshExerciseNames = await _exerciseRepository.GetAllExerciseNamesAsync();
+            if (freshExerciseNames == null || !freshExerciseNames.Any())
+            {
+                throw new InvalidOperationException("Failed to fetch exercise names from the repository.");
+            }
+
+            lock (_cacheLock)
+            {
+                // Update cache
+                _exerciseCache = freshExerciseNames;
+                _cacheExpirationTime = DateTime.UtcNow.AddMinutes(30);
+            }
+
+            return _exerciseCache;
+        }
+
 
         private static T? CreateExerciseInstance<T>(Guid exerciseId, IExerciseDto exerciseDto) where T : class, new()
         {

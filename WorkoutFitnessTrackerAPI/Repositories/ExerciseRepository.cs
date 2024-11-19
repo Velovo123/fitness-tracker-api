@@ -17,6 +17,14 @@ namespace WorkoutFitnessTrackerAPI.Repositories
             _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
+        public async Task<List<string>> GetAllExerciseNamesAsync()
+        {
+            return await _context.Exercises
+                .AsNoTracking()
+                .Select(e => e.Name)
+                .ToListAsync();
+        }
+
         public async Task<Exercise?> GetByNameAsync(string name)
         {
             return await _context.Exercises
