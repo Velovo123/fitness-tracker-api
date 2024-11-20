@@ -20,6 +20,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
         }
 
         [HttpGet]
+        [ProducesResponseType(typeof(ResponseWrapper<IEnumerable<ProgressRecordDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseWrapper<IEnumerable<ProgressRecordDto>>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetProgressRecords([FromQuery] ProgressRecordQueryParams queryParams)
         {
             var userId = GetUserId();
@@ -33,6 +35,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
         }
 
         [HttpPost]
+        [ProducesResponseType(typeof(ResponseWrapper<string>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ResponseWrapper<string>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> SaveProgressRecord([FromBody] ProgressRecordDto progressRecordDto, [FromQuery] bool overwrite = false)
         {
             if (!ModelState.IsValid)
@@ -52,6 +56,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
         }
 
         [HttpGet("date/{date}/exercise/{exerciseName}")]
+        [ProducesResponseType(typeof(ResponseWrapper<ProgressRecordDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseWrapper<ProgressRecordDto>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetProgressRecordByDate(DateTime date, string exerciseName)
         {
             var userId = GetUserId();
@@ -65,6 +71,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
         }
 
         [HttpDelete("date/{date}/exercise/{exerciseName}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ResponseWrapper<string>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteProgressRecord(DateTime date, string exerciseName)
         {
             var userId = GetUserId();
