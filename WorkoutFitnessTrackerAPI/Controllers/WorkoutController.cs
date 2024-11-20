@@ -20,6 +20,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
 
         [HttpGet]
         [ResponseCache(Duration = 60)]
+        [ProducesResponseType(typeof(ResponseWrapper<IEnumerable<WorkoutDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseWrapper<IEnumerable<WorkoutDto>>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetWorkouts([FromQuery] WorkoutQueryParams? queryParams = null)
         {
             var userId = GetUserId();
@@ -32,6 +34,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
         }
 
         [HttpPost]
+        [ProducesResponseType(typeof(ResponseWrapper<string>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ResponseWrapper<string>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> SaveWorkout([FromBody] WorkoutDto workoutDto, [FromQuery] bool overwrite = false)
         {
             if (!ModelState.IsValid)
@@ -50,6 +54,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
 
         [HttpGet("date/{date}")]
         [ResponseCache(Duration = 30)]
+        [ProducesResponseType(typeof(ResponseWrapper<IEnumerable<WorkoutDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseWrapper<IEnumerable<WorkoutDto>>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetWorkoutByDate(DateTime date)
         {
             var userId = GetUserId();
@@ -62,6 +68,8 @@ namespace WorkoutFitnessTrackerAPI.Controllers
         }
 
         [HttpDelete("date/{date}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ResponseWrapper<string>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteWorkout(DateTime date)
         {
             var userId = GetUserId();
