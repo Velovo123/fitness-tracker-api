@@ -10,9 +10,7 @@
 - [API Endpoints](#api-endpoints)
 - [Project Structure](#project-structure)
 - [Testing](#testing)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+
 ## Features
 
 ### Core Functionalities
